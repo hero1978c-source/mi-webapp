@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PhishGuard – Operación Bandeja de Entrada</title>
+<style>
+/* ─── BASE ─────────────────────────────────────────────── */
+:root{
+  --bg0:#05080f;--bg1:#0b1222;--bg2:#111a30;--bg3:#18243e;
+  --cyan:#00e5ff;--green:#00ff88;--red:#ff2d55;--orange:#ff9f0a;
+  --yellow:#ffd60a;--purple:#bf5af2;--blue:#4a9eff;
+  --text:#dce8ff;--dim:#4e6b99;--border:rgba(0,229,255,.13);
+  --mono:'Courier New',monospace;--ui:'Segoe UI',system-ui,sans-serif;
+  --r8:8px;--r12:12px;--r16:16px;--r24:24px;--r32:32px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow-x:hidden}
+body{font-family:var(--ui);background:var(--bg0);color:var(--text);min-height:100vh}
+a{pointer-events:none;text-decoration:none;color:inherit}
+button{font-family:var(--ui);cursor:pointer}
+canvas#stars-bg{position:fixed;inset:0;z-index:0;pointer-events:none}
+
+/* ─── SCREEN SYSTEM ────────────────────────────────────── */
+.scr{display:none;flex-direction:column;align-items:center;justify-content:center;
+     min-height:100vh;position:relative;z-index:1;padding:20px 16px}
+.scr.on{display:flex}
+
+/* ─── SCAN LINE OVERLAY ────────────────────────────────── */
+body::after{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.04) 2px,rgba(0,0,0,.04) 4px);
+}
+
+/* ─── TYPOGRAPHY ───────────────────────────────────────── */
+.t-glow-c{color:var(--cyan);text-shadow:0 0 20px rgba(0,229,255,.5)}
+.t-glow-g{color:var(--green);text-shadow:0 0 20px rgba(0,255,136,.4)}
+.t-glow-r{color:var(--red);text-shadow:0 0 20px rgba(255,45,85,.5)}
+.t-glow-y{color:var(--yellow);text-shadow:0 0 20px rgba(255,214,10,.5)}
+.t-mono{font-family:var(--mono)}
+.t-dim{color:var(--dim)}
+.t-upper{text-transform:uppercase;letter-spacing:3px}
+
+/* ─── CARDS ────────────────────────────────────────────── */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r12);padding:16px 20px}
+.card-sm{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r8);padding:12px 16px}
+
+/* ─── BUTTONS ──────────────────────────────────────────── */
+.btn{border:none;border-radius:var(--r32);font-weight:800;letter-spacing:2px;
+     text-transform:uppercase;transition:.18s;cursor:pointer;display:inline-flex;
+     align-items:center;justify-content:center;gap:8px}
+.btn:active{transform:scale(.97)}
+.btn-cyan{background:linear-gradient(135deg,var(--cyan),#0099cc);color:#000;
+          box-shadow:0 0 28px rgba(0,229,255,.35)}
+.btn-cyan:hover{box-shadow:0 0 50px rgba(0,229,255,.6);transform:scale(1.04)}
+.btn-outline{background:transparent;color:var(--cyan);border:2px solid var(--cyan)}
+.btn-outline:hover{background:rgba(0,229,255,.08)}
+.btn-danger{background:linear-gradient(135deg,#ff2d55,#b0002a);color:#fff;
+            box-shadow:0 0 20px rgba(255,45,85,.3)}
+.btn-danger:hover{box-shadow:0 0 40px rgba(255,45,85,.6);transform:scale(1.04)}
+.btn-success{background:linear-gradient(135deg,#00ff88,#00a854);color:#000;
+             box-shadow:0 0 20px rgba(0,255,136,.25)}
+.btn-success:hover{box-shadow:0 0 40px rgba(0,255,136,.5);transform:scale(1.04)}
+.btn-lg{font-size:16px;padding:15px 44px}
+.btn-md{font-size:14px;padding:12px 32px}
+.btn-sm{font-size:12px;padding:9px 22px}
+
+/* ─── HUD ──────────────────────────────────────────────── */
+#hud{position:fixed;top:0;left:0;right:0;z-index:200;
+     background:rgba(5,8,15,.94);border-bottom:1px solid var(--border);
+     backdrop-filter:blur(14px);padding:8px 16px;
+     display:none;align-items:center;gap:10px;flex-wrap:wrap;min-height:58px}
+.hb{display:flex;flex-direction:column;align-items:center;min-width:52px}
+.hl{font-size:8px;color:var(--dim);text-transform:uppercase;letter-spacing:2px;font-family:var(--mono);white-space:nowrap}
+.hv{font-size:18px;font-weight:800;font-family:var(--mono);line-height:1.1}
+.hsep{width:1px;height:38px;background:var(--border);flex-shrink:0}
+.hsp{flex:1}
+#hv-score .hv{color:var(--cyan)}
+#hv-combo .hv{color:var(--yellow);transition:color .3s}
+#hv-lives .hv{font-size:15px}
+#hv-timer .hv{color:var(--orange);font-size:22px}
+#hv-level .hv{color:var(--green)}
+.hprog{flex:1;min-width:100px}
+.hprog-bar{height:5px;background:var(--bg3);border-radius:4px;overflow:hidden;margin-top:5px}
+.hprog-fill{height:100%;background:linear-gradient(90deg,var(--cyan),var(--green));
+            border-radius:4px;transition:width .45s ease}
+#hud-badges{display:flex;gap:4px;align-items:center;margin-left:6px}
+.bdg-mini{font-size:18px;animation:pop .35s}
+
+/* ─── TOAST ────────────────────────────────────────────── */
+#toasts{position:fixed;top:66px;right:14px;z-index:500;
+        display:flex;flex-direction:column;gap:7px;pointer-events:none;max-width:280px}
+.toast{border-radius:var(--r8);padding:9px 14px;font-size:12px;font-weight:700;
+       animation:toastIn .3s ease;border:1px solid}
+.tc{border-color:var(--cyan);color:var(--cyan);background:rgba(0,229,255,.1)}
+.tg{border-color:var(--green);color:var(--green);background:rgba(0,255,136,.08)}
+.tr{border-color:var(--red);color:var(--red);background:rgba(255,45,85,.1)}
+.ty{border-color:var(--yellow);color:var(--yellow);background:rgba(255,214,10,.08)}
+
+/* ─── SCREEN: INTRO ────────────────────────────────────── */
+#s-intro{gap:20px;text-align:center}
+.logo-anim{font-size:88px;animation:float 3s ease-in-out infinite;filter:drop-shadow(0 0 30px rgba(0,229,255,.5))}
+.game-title{font-size:clamp(38px,7vw,78px);font-weight:900;letter-spacing:5px;
+            background:linear-gradient(135deg,var(--cyan) 0%,var(--green) 100%);
+            -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+            filter:drop-shadow(0 0 24px rgba(0,229,255,.4))}
+.game-sub{font-size:clamp(11px,2vw,16px);color:var(--dim);letter-spacing:7px;font-family:var(--mono)}
+.game-desc{max-width:500px;font-size:14px;color:#7c9bbf;line-height:1.75;margin-top:4px}
+.intro-stats{display:flex;gap:16px;flex-wrap:wrap;justify-content:center}
+.istat{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r12);
+       padding:14px 22px;text-align:center}
+.istat-v{font-size:32px;font-weight:900;color:var(--cyan)}
+.istat-l{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:2px;margin-top:2px}
+.kb-hint{font-size:11px;color:var(--dim);font-family:var(--mono);margin-top:4px}
+
+/* ─── SCREEN: GAME ─────────────────────────────────────── */
+#s-game{padding-top:72px;padding-bottom:80px;justify-content:flex-start;
+        align-items:stretch;max-width:860px;margin:0 auto;width:100%}
+.lvl-banner{text-align:center;padding:10px 16px;margin-bottom:14px;
+            background:var(--bg2);border:1px solid var(--border);border-radius:var(--r8);
+            font-family:var(--mono);font-size:12px;color:var(--dim)}
+.lvl-banner span{color:var(--cyan);font-weight:700}
+
+/* email card */
+.email-card{background:var(--bg1);border:1px solid var(--border);border-radius:var(--r16);
+            overflow:hidden;box-shadow:0 10px 50px rgba(0,0,0,.6)}
+.email-tb{background:var(--bg2);padding:11px 14px;display:flex;align-items:center;gap:9px;border-bottom:1px solid var(--border)}
+.dot{width:11px;height:11px;border-radius:50%}
+.tb-lbl{font-size:11px;color:var(--dim);font-family:var(--mono);margin-left:6px}
+.email-meta{padding:14px 18px;border-bottom:1px solid var(--border);background:var(--bg2)}
+.ef{display:flex;gap:8px;margin-bottom:5px;font-size:12px}
+.ef-k{color:var(--dim);min-width:48px;font-family:var(--mono)}
+.ef-v{color:var(--text)}
+.email-subj{padding:12px 18px;border-bottom:1px solid var(--border);
+            font-size:15px;font-weight:700;color:var(--text);background:var(--bg1)}
+.email-body{background:#fff;color:#222;min-height:200px;padding:18px 20px;font-size:13px;line-height:1.65}
+.email-body .em-header{color:#fff;padding:13px 16px;border-radius:8px 8px 0 0;font-size:15px;font-weight:700}
+.email-body .em-body{padding:14px;border:1px solid #ddd;border-top:none;border-radius:0 0 8px 8px}
+.email-body .em-body p{margin-bottom:9px}
+.email-body .em-body ul,.email-body .em-body ol{margin:6px 0 6px 18px}
+.email-body .em-cta-wrap{text-align:center;margin:16px 0}
+.email-body .em-cta{display:inline-block;padding:10px 24px;border-radius:6px;font-weight:700;font-size:13px;color:#fff;cursor:default}
+.email-body .em-info-box{border:1px solid #ccc;border-radius:6px;padding:11px 13px;margin:10px 0;font-size:12px;line-height:1.6}
+.email-body .em-footer{font-size:11px;color:#999;margin-top:8px}
+.email-body hr{border:none;border-top:1px solid #ddd}
+
+/* action bar */
+#action-bar{position:fixed;bottom:0;left:0;right:0;z-index:200;
+            background:rgba(5,8,15,.94);border-top:1px solid var(--border);
+            backdrop-filter:blur(14px);padding:10px 16px;
+            display:none;gap:12px;justify-content:center;align-items:center}
+.btn-classify{flex:1;max-width:350px;padding:13px 18px;border-radius:var(--r12);border:none;
+              cursor:pointer;font-size:14px;font-weight:800;letter-spacing:1px;
+              text-transform:uppercase;transition:.15s;display:flex;align-items:center;
+              justify-content:center;gap:8px;font-family:var(--ui)}
+.btn-classify:disabled{opacity:.5;cursor:not-allowed;transform:none!important}
+.btn-phish{background:linear-gradient(135deg,#ff2d55,#b0002a);color:#fff;box-shadow:0 4px 20px rgba(255,45,85,.4)}
+.btn-phish:hover:not(:disabled){transform:scale(1.03);box-shadow:0 6px 32px rgba(255,45,85,.7)}
+.btn-legit{background:linear-gradient(135deg,#00ff88,#009050);color:#000;box-shadow:0 4px 20px rgba(0,255,136,.3)}
+.btn-legit:hover:not(:disabled){transform:scale(1.03);box-shadow:0 6px 32px rgba(0,255,136,.6)}
+.kh{font-size:9px;opacity:.55;font-family:var(--mono);display:block;font-weight:400}
+
+/* ─── MODAL ────────────────────────────────────────────── */
+#modal{position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.8);
+       backdrop-filter:blur(8px);display:none;align-items:center;
+       justify-content:center;padding:16px}
+#modal.on{display:flex}
+.modal-box{background:var(--bg1);border-radius:var(--r24);max-width:680px;width:100%;
+           max-height:88vh;overflow-y:auto;border:1px solid var(--border);
+           box-shadow:0 24px 80px rgba(0,0,0,.85);animation:slideUp .28s ease}
+.modal-hdr{padding:18px 22px;display:flex;align-items:center;gap:14px;border-bottom:1px solid var(--border)}
+.modal-ico{font-size:46px;flex-shrink:0}
+.modal-verd{font-size:20px;font-weight:900}
+.modal-pts{font-size:12px;color:var(--dim);font-family:var(--mono);margin-top:3px}
+.modal-body-inner{padding:18px 22px}
+.modal-expl{font-size:13px;line-height:1.75;color:#9bbcde;background:var(--bg2);
+            padding:13px 16px;border-radius:var(--r8);margin-bottom:14px;border-left:3px solid var(--cyan)}
+.flags-hdr{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:2px;
+           font-family:var(--mono);margin-bottom:8px}
+.flag{display:flex;gap:11px;align-items:flex-start;padding:9px 12px;
+      background:var(--bg2);border:1px solid var(--border);border-radius:var(--r8);margin-bottom:7px}
+.flag-ic{font-size:20px;flex-shrink:0;margin-top:1px}
+.flag-ti{font-size:12px;font-weight:700;color:var(--orange);margin-bottom:2px}
+.flag-ds{font-size:11px;color:var(--dim);line-height:1.5}
+.legit-box{background:rgba(0,255,136,.07);border:1px solid rgba(0,255,136,.2);
+           border-radius:var(--r8);padding:11px 14px;font-size:12px;color:#6effc0;margin-bottom:12px}
+.modal-ft{padding:14px 22px;border-top:1px solid var(--border);display:flex;justify-content:center}
+
+/* ─── SCREEN: LEVEL COMPLETE ────────────────────────────── */
+#s-level{gap:18px;text-align:center}
+.lc-icon{font-size:72px;animation:float 2s ease-in-out infinite}
+.lc-title{font-size:46px;font-weight:900}
+.lc-sub{font-size:12px;color:var(--dim);font-family:var(--mono);letter-spacing:4px}
+.lc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));
+         gap:12px;max-width:480px;width:100%}
+.lcs{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r12);padding:14px;text-align:center}
+.lcs-v{font-size:30px;font-weight:900;color:var(--cyan)}
+.lcs-l{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:1px;margin-top:2px}
+.badge-earned{background:var(--bg2);border:2px solid var(--yellow);border-radius:var(--r16);
+             padding:14px 22px;max-width:320px;text-align:center;animation:pop .5s}
+.be-ic{font-size:46px}
+.be-nm{font-size:14px;font-weight:700;color:var(--yellow);margin-top:6px}
+.be-ds{font-size:11px;color:var(--dim);margin-top:3px}
+
+/* ─── SCREEN: GAME OVER ─────────────────────────────────── */
+#s-gameover{gap:18px;text-align:center}
+.go-icon{font-size:88px;animation:shake .5s ease}
+.go-title{font-size:54px;font-weight:900}
+.go-msg{font-size:14px;color:var(--dim);max-width:420px;line-height:1.75}
+.go-score-wrap{text-align:center}
+.go-score-lbl{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:3px;margin-bottom:4px}
+.go-score{font-size:52px;font-weight:900;font-family:var(--mono)}
+.go-summary{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r12);
+            padding:14px 20px;max-width:400px;width:100%;text-align:left}
+.go-sum-row{display:flex;justify-content:space-between;font-size:13px;padding:6px 0;
+            border-bottom:1px solid var(--border)}
+.go-sum-row:last-child{border:none}
+.go-sum-row .k{color:var(--dim)}
+.go-sum-row .v{font-weight:700;font-family:var(--mono)}
+
+/* ─── SCREEN: VICTORY ───────────────────────────────────── */
+#s-victory{gap:18px;text-align:center}
+.vc-icon{font-size:88px;animation:float 2s ease-in-out infinite}
+.vc-title{font-size:clamp(28px,5vw,58px);font-weight:900;letter-spacing:2px;
+          background:linear-gradient(135deg,var(--yellow),var(--orange));
+          -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+          filter:drop-shadow(0 0 22px rgba(255,214,10,.5))}
+.vc-score-wrap{text-align:center}
+.vc-score{font-size:56px;font-weight:900;font-family:var(--mono);color:var(--cyan)}
+
+/* results table */
+.results-table{max-width:640px;width:100%;background:var(--bg2);
+               border:1px solid var(--border);border-radius:var(--r12);overflow:hidden}
+.rt-head{display:grid;grid-template-columns:80px 1fr 70px 70px 70px 80px;
+         gap:0;background:var(--bg3);padding:10px 16px;
+         font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:1px;font-family:var(--mono)}
+.rt-row{display:grid;grid-template-columns:80px 1fr 70px 70px 70px 80px;
+        gap:0;padding:10px 16px;border-top:1px solid var(--border);font-size:13px;align-items:center}
+.rt-row:hover{background:var(--bg3)}
+.rt-total{display:grid;grid-template-columns:80px 1fr 70px 70px 70px 80px;
+          gap:0;padding:10px 16px;border-top:2px solid var(--cyan);font-weight:800;
+          font-size:13px;background:var(--bg3)}
+.pct{font-size:11px;color:var(--dim)}
+
+/* badges gallery */
+.badges-gallery{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;max-width:520px}
+.bg-card{background:var(--bg2);border:1px solid rgba(255,214,10,.25);border-radius:var(--r8);
+         padding:8px 14px;font-size:12px;display:flex;align-items:center;gap:7px}
+.bg-card .bi{font-size:22px}
+
+/* tips */
+.tips-box{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r12);
+          padding:16px 20px;max-width:580px;width:100%;text-align:left}
+.tips-title{font-size:11px;color:var(--cyan);text-transform:uppercase;letter-spacing:2px;
+            margin-bottom:12px;font-family:var(--mono)}
+.tip{display:flex;gap:10px;font-size:12px;color:var(--dim);margin-bottom:8px;line-height:1.55}
+.tip .tn{color:var(--green);flex-shrink:0;font-family:var(--mono);font-weight:700}
+
+/* ─── ANIMATIONS ────────────────────────────────────────── */
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
+@keyframes pop{0%{transform:scale(.4);opacity:0}70%{transform:scale(1.12)}100%{transform:scale(1);opacity:1}}
+@keyframes slideUp{from{transform:translateY(28px);opacity:0}to{transform:translateY(0);opacity:1}}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-9px)}40%{transform:translateX(9px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)}}
+@keyframes toastIn{from{transform:translateX(60px);opacity:0}to{transform:translateX(0);opacity:1}}
+@keyframes timerPulse{0%,100%{opacity:1}50%{opacity:.3}}
+@keyframes comboPop{0%{transform:scale(1.5)}100%{transform:scale(1)}}
+@keyframes hudFlash{0%,100%{box-shadow:none}50%{box-shadow:0 0 24px rgba(255,45,85,.7)}}
+.timer-warn{animation:timerPulse .55s ease-in-out infinite}
+.combo-anim{animation:comboPop .3s ease}
+
+/* ─── SCROLLBAR ─────────────────────────────────────────── */
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:var(--bg1)}
+::-webkit-scrollbar-thumb{background:var(--bg3);border-radius:4px}
+
+/* ─── RANK BADGE ────────────────────────────────────────── */
+.rank-badge{padding:10px 28px;border-radius:var(--r32);font-size:14px;font-weight:800;
+            letter-spacing:2px;text-transform:uppercase;margin-top:4px;display:inline-block}
+</style>
+</head>
+<body>
+<canvas id="stars-bg"></canvas>
+<div id="toasts"></div>
+
+<!-- ══════ HUD ══════ -->
+<div id="hud">
+  <div class="hb" id="hv-level"><div class="hl">Nivel</div><div class="hv" id="hval-level" style="color:var(--green)">1</div></div>
+  <div class="hsep"></div>
+  <div class="hb" id="hv-score"><div class="hl">Puntos</div><div class="hv" id="hval-score">0</div></div>
+  <div class="hsep"></div>
+  <div class="hb" id="hv-combo"><div class="hl">Combo</div><div class="hv" id="hval-combo">×1</div></div>
+  <div class="hsep"></div>
+  <div class="hb"><div class="hl">Vidas</div><div class="hv" id="hval-lives" style="letter-spacing:1px">❤️❤️❤️</div></div>
+  <div class="hsep"></div>
+  <div class="hb" id="hv-timer"><div class="hl">Tiempo</div><div class="hv" id="hval-timer">30</div></div>
+  <div class="hsp"></div>
+  <div class="hprog">
+    <div class="hl">Progreso nivel</div>
+    <div class="hprog-bar"><div class="hprog-fill" id="hval-prog" style="width:0%"></div></div>
+  </div>
+  <div id="hud-badges"></div>
+</div>
+
+<!-- ══════ ACTION BAR ══════ -->
+<div id="action-bar">
+  <button class="btn-classify btn-phish" id="btn-phish" onclick="G.pick(true)">
+    🎣 ES PHISHING <span class="kh">tecla F</span>
+  </button>
+  <button class="btn-classify btn-legit" id="btn-legit" onclick="G.pick(false)">
+    ✅ ES LEGÍTIMO <span class="kh">tecla L</span>
+  </button>
+</div>
+
+<!-- ══════ SCREEN: INTRO ══════ -->
+<div class="scr on" id="s-intro">
+  <div class="logo-anim">🛡️</div>
+  <div class="game-title">PHISHGUARD</div>
+  <div class="game-sub">Operación Bandeja de Entrada</div>
+  <div class="game-desc">Eres el nuevo Agente de Ciberseguridad. Analiza cada correo antes de que el atacante comprometa la empresa. Los retos son aleatorios: cada partida es diferente.</div>
+  <div class="intro-stats">
+    <div class="istat"><div class="istat-v">20</div><div class="istat-l">Escenarios</div></div>
+    <div class="istat"><div class="istat-v">5</div><div class="istat-l">Niveles</div></div>
+    <div class="istat"><div class="istat-v">8</div><div class="istat-l">Insignias</div></div>
+    <div class="istat"><div class="istat-v">3</div><div class="istat-l">Vidas</div></div>
+  </div>
+  <button class="btn btn-cyan btn-lg" onclick="G.start()">⚡ INICIAR MISIÓN</button>
+  <div class="kb-hint">[ F ] Phishing &nbsp;|&nbsp; [ L ] Legítimo &nbsp;|&nbsp; [ Enter ] Continuar</div>
+</div>
+
+<!-- ══════ SCREEN: GAME ══════ -->
+<div class="scr" id="s-game">
+  <div class="lvl-banner" id="lvl-banner">
+    Nivel <span id="b-lvl">1</span> – <span id="b-diff">Amenazas Básicas</span>
+    &nbsp;|&nbsp; Correo <span id="b-cur">1</span> de <span id="b-tot">4</span>
+  </div>
+  <div class="email-card" id="email-card">
+    <div class="email-tb">
+      <div class="dot" style="background:#ff5f57"></div>
+      <div class="dot" style="background:#febc2e"></div>
+      <div class="dot" style="background:#28c840"></div>
+      <div class="tb-lbl" id="tb-lbl">PhishGuard Mail Client v3.0</div>
+    </div>
+    <div class="email-meta" id="email-meta"></div>
+    <div class="email-subj" id="email-subj"></div>
+    <div class="email-body" id="email-body"></div>
+  </div>
+</div>
+
+<!-- ══════ MODAL ══════ -->
+<div id="modal">
+  <div class="modal-box">
+    <div class="modal-hdr" id="modal-hdr">
+      <div class="modal-ico" id="modal-ico"></div>
+      <div><div class="modal-verd" id="modal-verd"></div><div class="modal-pts" id="modal-pts"></div></div>
+    </div>
+    <div class="modal-body-inner" id="modal-body"></div>
+    <div class="modal-ft"><button class="btn btn-cyan btn-md" id="btn-next" onclick="G.next()">CONTINUAR →</button></div>
+  </div>
+</div>
+
+<!-- ══════ SCREEN: LEVEL COMPLETE ══════ -->
+<div class="scr" id="s-level">
+  <div class="lc-icon" id="lc-ico">✅</div>
+  <div class="lc-title t-glow-g" id="lc-title">NIVEL SUPERADO</div>
+  <div class="lc-sub" id="lc-sub">NIVEL 1 – AMENAZAS BÁSICAS</div>
+  <div class="lc-grid" id="lc-grid"></div>
+  <div class="badge-earned" id="lc-badge" style="display:none"></div>
+  <button class="btn btn-cyan btn-lg" id="btn-nextlvl" onclick="G.nextLevel()">SIGUIENTE NIVEL →</button>
+</div>
+
+<!-- ══════ SCREEN: GAME OVER ══════ -->
+<div class="scr" id="s-gameover">
+  <div class="go-icon">💀</div>
+  <div class="go-title t-glow-r">MISIÓN FALLIDA</div>
+  <div class="go-msg">Se agotaron tus vidas. El atacante logró su objetivo. En ciberseguridad real no hay segunda oportunidad.</div>
+  <div class="go-score-wrap">
+    <div class="go-score-lbl">Puntuación Final</div>
+    <div class="go-score t-glow-c" id="go-score">0</div>
+  </div>
+  <div class="go-summary" id="go-summary"></div>
+  <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
+    <button class="btn btn-cyan btn-lg" onclick="G.restart()">🔄 REINTENTAR</button>
+    <button class="btn btn-outline btn-md" onclick="G.intro()">🏠 INICIO</button>
+  </div>
+</div>
+
+<!-- ══════ SCREEN: VICTORY ══════ -->
+<div class="scr" id="s-victory">
+  <div class="vc-icon">🏆</div>
+  <div class="vc-title">AGENTE ÉLITE</div>
+  <div class="t-upper t-dim t-mono" style="font-size:11px;letter-spacing:5px">Misión Completada · 5/5 Niveles</div>
+  <div class="vc-score-wrap">
+    <div class="go-score-lbl">Puntuación Final</div>
+    <div class="vc-score" id="vc-score">0</div>
+  </div>
+  <div id="vc-rank" class="rank-badge"></div>
+  <div class="results-table" id="results-table">
+    <div class="rt-head">
+      <div>Nivel</div><div>Dificultad</div>
+      <div style="text-align:center">✅</div>
+      <div style="text-align:center">❌</div>
+      <div style="text-align:center">Combo</div>
+      <div style="text-align:right">Pts</div>
+    </div>
+    <div id="rt-rows"></div>
+  </div>
+  <div class="badges-gallery" id="vc-badges"></div>
+  <div class="tips-box">
+    <div class="tips-title">📋 Reglas de Oro – Ciberseguridad</div>
+    <div class="tip"><span class="tn">01</span><span>Verifica siempre el dominio exacto del remitente antes de hacer clic en cualquier enlace.</span></div>
+    <div class="tip"><span class="tn">02</span><span>Ninguna entidad legítima pide contraseña, CVV o PIN por correo electrónico. Nunca.</span></div>
+    <div class="tip"><span class="tn">03</span><span>La urgencia extrema es siempre señal de alarma. Tómate 60 segundos para analizar.</span></div>
+    <div class="tip"><span class="tn">04</span><span>Ante transferencias urgentes del CEO, llama directamente. El BEC es el fraude más costoso del mundo.</span></div>
+    <div class="tip"><span class="tn">05</span><span>Accede directamente a los sitios oficiales. Nunca desde botones o enlaces en emails sospechosos.</span></div>
+    <div class="tip"><span class="tn">06</span><span>Ante cualquier duda, consulta con el equipo de TI/Seguridad antes de actuar. Siempre.</span></div>
+  </div>
+  <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
+    <button class="btn btn-cyan btn-lg" onclick="G.restart()">🎮 JUGAR DE NUEVO</button>
+    <button class="btn btn-outline btn-md" onclick="G.intro()">🏠 INICIO</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     JAVASCRIPT ENGINE
+══════════════════════════════════════════════════════════════ -->
+<script>
+// ──────────────────────────────────────────────────────────
+//  DATA
+// ──────────────────────────────────────────────────────────
+const EMAILS_RAW = [{"id": 1, "level": 1, "isPhishing": true, "from_name": "Soporte Banco Nacional", "from_email": "soporte@banconacional-seguridad.xyz", "to": "empleado@miempresa.com", "date": "Hoy, 09:14 AM", "subject": "⚠️ URGENTE: Su cuenta ha sido SUSPENDIDA – Actúe AHORA", "body_html": "\n<div class=\"em-header\" style=\"background:#003087\">🏦 BANCO NACIONAL – Seguridad</div>\n<div class=\"em-body\">\n  <p>Estimado cliente,</p>\n  <p><strong style=\"color:#cc0000\">⚠️ SU CUENTA HA SIDO SUSPENDIDA TEMPORALMENTE</strong></p>\n  <p>Hemos detectado actividad <strong>SOSPECHOSA</strong> en su cuenta.\n     Debe verificar su identidad en las próximas <strong style=\"color:#cc0000\">2 HORAS</strong>\n     o su cuenta será <u>cerrada permanentemente</u>.</p>\n  <div class=\"em-cta-wrap\"><a class=\"em-cta\" href=\"#\">🔓 VERIFICAR MI CUENTA AHORA</a></div>\n  <p>Necesitará proporcionar: número de cuenta, contraseña actual, número de tarjeta y CVV.</p>\n  <p class=\"em-footer\">Si no actúa, su cuenta será eliminada. Este es su único aviso.</p>\n</div>", "red_flags": [{"icon": "🌐", "title": "Dominio falso (.xyz)", "desc": "Los bancos nunca usan extensiones .xyz ni subdominios con guiones. El dominio real siempre es verificable en la web oficial."}, {"icon": "⏰", "title": "Urgencia artificial", "desc": "'2 HORAS' es manipulación psicológica para evitar que pienses. Los bancos reales notifican con días de antelación."}, {"icon": "🔑", "title": "Solicitud de datos críticos", "desc": "Ningún banco legítimo pide contraseña, número de tarjeta y CVV por correo electrónico. Siempre es trampa."}, {"icon": "📢", "title": "MAYÚSCULAS y amenazas", "desc": "Uso de mayúsculas, exclamaciones y amenazas de cierre son ingeniería social de phishing clásico."}], "explanation": "Phishing bancario clásico. Dominio falso + urgencia + datos sensibles. Los bancos reales NUNCA piden CVV o contraseña por email.", "legit_reason": null, "points": 100, "time_limit": 30}, {"id": 2, "level": 1, "isPhishing": false, "from_name": "IT Support – MiEmpresa", "from_email": "soporte.ti@miempresa.com", "to": "empleado@miempresa.com", "date": "Hoy, 10:30 AM", "subject": "Mantenimiento programado de sistemas – Sábado 02:00–04:00 AM", "body_html": "\n<div class=\"em-header\" style=\"background:#1a237e\">💻 Departamento de TI – MiEmpresa</div>\n<div class=\"em-body\">\n  <p>Estimado equipo,</p>\n  <p>El próximo <strong>sábado 15 de junio</strong> realizaremos mantenimiento preventivo en nuestra infraestructura.</p>\n  <p><strong>Horario:</strong> 02:00 AM – 04:00 AM | <strong>Servicios afectados:</strong></p>\n  <ul><li>Correo electrónico corporativo</li><li>VPN corporativa</li><li>Intranet y recursos compartidos</li></ul>\n  <p>No es necesario realizar ninguna acción. Los sistemas estarán disponibles antes del lunes.</p>\n  <p>Para consultas: <strong>ext. 2200</strong> o ticket en helpdesk.miempresa.com (intranet).</p>\n  <p>Atentamente,<br><strong>Equipo de TI</strong> | soporte.ti@miempresa.com | Ext. 2200</p>\n</div>", "red_flags": [], "explanation": "Correo legítimo del departamento de TI. Dominio corporativo oficial, sin datos sensibles requeridos, canales verificables internamente.", "legit_reason": "Dominio corporativo oficial · Sin solicitud de credenciales · Canales internos verificables · Sin urgencia manipuladora", "points": 100, "time_limit": 30}, {"id": 3, "level": 1, "isPhishing": true, "from_name": "Amazon", "from_email": "noreply@amazon-confirmaciones-pedidos.net", "to": "empleado@miempresa.com", "date": "Ayer, 11:45 PM", "subject": "Pedido #AMZ-8847291 – Confirme su dirección URGENTE", "body_html": "\n<div class=\"em-header\" style=\"background:#ff9900;color:#232f3e\">📦 amazon – Confirmación de Pedido</div>\n<div class=\"em-body\">\n  <p>Hemos procesado su pedido pero necesitamos confirmar su dirección de entrega.</p>\n  <div class=\"em-info-box\" style=\"border-color:#ff9900;background:#fff8ee\">\n    <strong>Pedido #AMZ-8847291</strong><br>\n    Artículo: iPhone 15 Pro Max 256GB | Total: $1,299.99 USD<br>\n    Estado: <span style=\"color:#e67e00\">⚠️ Pendiente de confirmación</span>\n  </div>\n  <p><strong>Si no confirma en 24 horas, el pedido será cancelado y se realizará el cargo de todas formas.</strong></p>\n  <div class=\"em-cta-wrap\"><a class=\"em-cta\" href=\"#\">Confirmar Dirección y Datos de Pago</a></div>\n  <p class=\"em-footer\">Amazon.com © 2024 | Dirección no monitoreada</p>\n</div>", "red_flags": [{"icon": "🌐", "title": "Dominio impostor", "desc": "Amazon usa amazon.com. 'amazon-confirmaciones-pedidos.net' es un dominio registrado por atacantes."}, {"icon": "🛒", "title": "Pedido no solicitado", "desc": "El atacante espera que hagas clic para 'cancelarlo'. Ambas opciones capturan tus credenciales."}, {"icon": "💳", "title": "Solicitud de datos de pago", "desc": "Amazon nunca pide datos de pago por email para pedidos ya procesados."}, {"icon": "⚠️", "title": "Contradicción lógica", "desc": "'Cancelado pero con cargo de todas formas' es una amenaza ilógica diseñada para generar pánico."}], "explanation": "Phishing de Amazon con pedido falso de alto valor. Objetivo: robarte credenciales mientras intentas 'cancelar' el cargo.", "legit_reason": null, "points": 100, "time_limit": 30}, {"id": 4, "level": 1, "isPhishing": false, "from_name": "María González – RRHH", "from_email": "m.gonzalez@miempresa.com", "to": "empleado@miempresa.com", "date": "Hoy, 08:15 AM", "subject": "Recordatorio: Encuesta de Clima Laboral 2024 – Vence el viernes", "body_html": "\n<div class=\"em-header\" style=\"background:#2e7d32\">👥 Recursos Humanos – MiEmpresa</div>\n<div class=\"em-body\">\n  <p>Estimado colaborador,</p>\n  <p>Le recordamos que la <strong>Encuesta Anual de Clima Laboral 2024</strong> cierra el próximo <strong>viernes 19 de junio</strong>.</p>\n  <p>La encuesta es completamente <strong>anónima</strong> y toma aproximadamente 10 minutos.</p>\n  <div class=\"em-info-box\" style=\"border-color:#2e7d32;background:#f1f8e9\">\n    <strong>Acceso:</strong> Intranet → Recursos Humanos → Encuesta Clima 2024\n  </div>\n  <p>El <strong>67% del equipo</strong> ya ha participado. ¡Únase a sus colegas!</p>\n  <p>Ante cualquier duda, estoy en la extensión <strong>1045</strong>.<br>\n  <strong>María González</strong> – Analista RRHH | m.gonzalez@miempresa.com | Ext. 1045</p>\n</div>", "red_flags": [], "explanation": "Correo legítimo de RRHH. Dominio corporativo, sin credenciales, acceso vía intranet, contacto verificable.", "legit_reason": "Dominio corporativo · Acceso solo por intranet · Sin datos sensibles · Contacto interno verificable", "points": 100, "time_limit": 30}, {"id": 5, "level": 2, "isPhishing": true, "from_name": "IT Helpdesk Corporativo", "from_email": "helpdesk@miempresa-support.com", "to": "empleado@miempresa.com", "date": "Hoy, 07:58 AM", "subject": "Acción requerida: Su contraseña corporativa expira en 24 horas", "body_html": "\n<div class=\"em-header\" style=\"background:#37474f\">🔐 IT Helpdesk – Seguridad Corporativa</div>\n<div class=\"em-body\">\n  <p>Estimado empleado,</p>\n  <p>Nuestros sistemas detectaron que su contraseña corporativa <strong>expirará en 24 horas</strong>.\n     Sin acción, perderá acceso a <u>todos</u> los sistemas.</p>\n  <div class=\"em-info-box\" style=\"border-color:#ff9800;background:#fff3e0\">\n    ⚠️ <strong>Acción requerida antes de:</strong> Mañana 08:00 AM\n  </div>\n  <p>Ingrese sus credenciales actuales y defina una nueva contraseña:</p>\n  <div class=\"em-cta-wrap\"><a class=\"em-cta\" href=\"#\" style=\"background:#37474f\">🔑 Actualizar Contraseña Ahora</a></div>\n  <p class=\"em-footer\">IT Security Team | No responda a este correo</p>\n</div>", "red_flags": [{"icon": "🌐", "title": "Typosquatting (dominio casi idéntico)", "desc": "'miempresa-support.com' vs 'miempresa.com'. Los atacantes compran dominios similares. Verifica siempre el dominio exacto."}, {"icon": "🔑", "title": "Trampa de credenciales", "desc": "El portal pedirá tu contraseña ACTUAL. IT real nunca necesita tu clave vigente para hacer un reset."}, {"icon": "⏰", "title": "Urgencia de 24h fabricada", "desc": "Las políticas de expiración se notifican con varios días y desde el propio sistema operativo, no por email."}, {"icon": "📧", "title": "'Estimado empleado' sin nombre", "desc": "Un sistema corporativo real conoce tu nombre. El saludo genérico indica campaña masiva de phishing."}], "explanation": "Phishing de credenciales que imita al IT. Typosquatting sutil + urgencia. Objetivo: robar tu contraseña para acceder a todos los sistemas internos.", "legit_reason": null, "points": 150, "time_limit": 25}, {"id": 6, "level": 2, "isPhishing": false, "from_name": "Facturación – Proveedor ABC", "from_email": "facturas@proveedorabc.com", "to": "empleado@miempresa.com", "date": "Ayer, 04:22 PM", "subject": "Factura #FAC-2024-0445 – Servicios de Consultoría Junio 2024", "body_html": "\n<div class=\"em-header\" style=\"background:#1565c0\">📄 Proveedor ABC S.A. – Facturación</div>\n<div class=\"em-body\">\n  <p>Estimado equipo de MiEmpresa,</p>\n  <p>Adjuntamos la factura de servicios de junio 2024, según contrato <strong>#CM-2023-089</strong>.</p>\n  <div class=\"em-info-box\" style=\"border-color:#1565c0;background:#e3f2fd\">\n    Número: <strong>FAC-2024-0445</strong> | Período: 01/06/2024 – 30/06/2024<br>\n    Concepto: Consultoría en gestión de proyectos<br>\n    Monto: $4,500.00 + IVA | Vencimiento: 30/07/2024\n  </div>\n  <p>Para consultas: facturas@proveedorabc.com | Tel: +1 (555) 234-5678 | proveedorabc.com/facturas</p>\n  <p><strong>Dept. de Facturación</strong> – Proveedor ABC S.A.</p>\n</div>", "red_flags": [], "explanation": "Factura legítima. Referencia a contrato específico, múltiples canales de contacto verificables, sin urgencia manipuladora.", "legit_reason": "Referencia a contrato existente · Sin urgencia · Múltiples canales verificables · Sin solicitud de credenciales", "points": 150, "time_limit": 25}, {"id": 7, "level": 2, "isPhishing": true, "from_name": "Microsoft 365 Security", "from_email": "security-alert@microsoft365-secure-team.com", "to": "empleado@miempresa.com", "date": "Hoy, 06:33 AM", "subject": "Alerta: Inicio de sesión desde ubicación desconocida – Moscú, Rusia", "body_html": "\n<div class=\"em-header\" style=\"background:#0078d4\">🪟 Microsoft 365 Security Alert</div>\n<div class=\"em-body\">\n  <p>Detectamos un inicio de sesión inusual en su cuenta de Microsoft 365:</p>\n  <div class=\"em-info-box\" style=\"border-color:#ffc107;background:#fff3cd\">\n    📍 <strong>Ubicación:</strong> Moscú, Rusia<br>\n    🕐 <strong>Hora:</strong> 06:28 AM (hace 5 minutos)<br>\n    💻 <strong>Dispositivo:</strong> Windows PC desconocido<br>\n    🌐 <strong>IP:</strong> 195.82.xxx.xxx\n  </div>\n  <p>Si no fue usted, tome acción <strong>inmediata</strong>:</p>\n  <div class=\"em-cta-wrap\">\n    <a class=\"em-cta\" href=\"#\" style=\"background:#d32f2f;margin-right:8px\">🔒 Asegurar mi Cuenta</a>\n    <a class=\"em-cta\" href=\"#\" style=\"background:#0078d4\">✅ Fui Yo</a>\n  </div>\n  <p class=\"em-footer\">Microsoft Corporation © 2024 | microsoft.com/security</p>\n</div>", "red_flags": [{"icon": "🌐", "title": "Dominio Microsoft falso", "desc": "Microsoft envía desde microsoft.com o accounts.microsoft.com. 'microsoft365-secure-team.com' es un dominio impostor."}, {"icon": "🗺️", "title": "Geografía alarmante calculada", "desc": "Usar 'Moscú, Rusia' maximiza el pánico. Los atacantes eligen ubicaciones que provocan reacción inmediata."}, {"icon": "🎯", "title": "Dos botones = trampa doble", "desc": "Ambos botones ('Asegurar' y 'Fui Yo') llevan al mismo sitio de phishing. La elección no importa."}, {"icon": "⏱️", "title": "'Hace 5 minutos': presión extrema", "desc": "La precisión temporal crea urgencia máxima. Es un dato inventado para impedir el análisis."}], "explanation": "Phishing de credenciales Microsoft. Con tu acceso M365 el atacante obtiene correo, OneDrive, Teams y todos los servicios conectados.", "legit_reason": null, "points": 150, "time_limit": 25}, {"id": 8, "level": 2, "isPhishing": false, "from_name": "Carlos Mendoza – Gerente General", "from_email": "c.mendoza@miempresa.com", "to": "empleado@miempresa.com", "date": "Hoy, 09:45 AM", "subject": "Reunión de equipo – Resultados Q2 y planificación Q3", "body_html": "\n<div class=\"em-header\" style=\"background:#4a148c\">📅 Comunicación Interna – Gerencia General</div>\n<div class=\"em-body\">\n  <p>Hola equipo,</p>\n  <p>Los convoco a la <strong>reunión mensual de resultados</strong> del Q2 y planificación Q3 2024.</p>\n  <div class=\"em-info-box\" style=\"border-color:#4a148c;background:#f3e5f5\">\n    📅 <strong>Fecha:</strong> Jueves 20 de junio, 10:00 AM – 12:00 PM<br>\n    📍 <strong>Lugar:</strong> Sala de Conferencias A (piso 3) + Teams<br>\n  </div>\n  <p><strong>Agenda:</strong></p>\n  <ol><li>Revisión KPIs Q2 (30 min)</li><li>Análisis de brechas (20 min)</li>\n      <li>Objetivos Q3 (30 min)</li><li>Preguntas (20 min)</li></ol>\n  <p>Confirmen asistencia respondiendo este correo o aceptando la invitación de calendario.<br>\n  <strong>Carlos Mendoza</strong> | Gerente General | c.mendoza@miempresa.com | Ext. 1001</p>\n</div>", "red_flags": [], "explanation": "Correo interno legítimo. Dominio corporativo oficial, agenda estructurada, contacto verificable.", "legit_reason": "Dominio corporativo · Agenda concreta · Canales de respuesta múltiples · Sin datos sensibles", "points": 150, "time_limit": 25}, {"id": 9, "level": 3, "isPhishing": true, "from_name": "Roberto Sánchez – CEO", "from_email": "r.sanchez@miempresa-corp.net", "to": "empleado@miempresa.com", "date": "Hoy, 11:02 AM", "subject": "CONFIDENCIAL: Transferencia urgente – Adquisición estratégica", "body_html": "\n<div class=\"em-header\" style=\"background:#b71c1c\">CONFIDENCIAL – CEO Office</div>\n<div class=\"em-body\">\n  <p>Hola,</p>\n  <p>Estoy en reunión con abogados y <strong>no puedo hablar por teléfono</strong>.\n     Necesito que proceses una transferencia bancaria urgente hoy mismo.</p>\n  <p>Estamos cerrando una <strong>adquisición estratégica confidencial</strong>.\n     Por instrucción del consejo, <u>no debe comunicarse internamente hasta su confirmación</u>.</p>\n  <div class=\"em-info-box\" style=\"border-color:#b71c1c;background:#ffebee\">\n    Beneficiario: Inversiones Globales LLC | Banco: First National Bank<br>\n    Cuenta: 4782-9901-0023 | Monto: <strong>$47,500 USD</strong> | Concepto: Anticipo – Confidencial\n  </div>\n  <p>Procesa y confirma por este mismo correo. <strong>No lo menciones a nadie.</strong></p>\n  <p>Roberto Sánchez | CEO, MiEmpresa</p>\n</div>", "red_flags": [{"icon": "📧", "title": "Business Email Compromise (BEC)", "desc": "Suplantar al CEO para transferencias es el ataque más costoso según el FBI IC3. Pérdidas globales superan $26 mil millones anuales."}, {"icon": "🌐", "title": "Dominio del CEO diferente al corporativo", "desc": "'miempresa-corp.net' vs 'miempresa.com'. Un carácter de diferencia, consecuencias devastadoras."}, {"icon": "🤫", "title": "Solicitud explícita de secreto", "desc": "'No lo menciones a nadie' aísla a la víctima e impide que colegas identifiquen el fraude."}, {"icon": "📵", "title": "Bloquea verificación telefónica", "desc": "'No puedo hablar por teléfono' elimina el canal de verificación. Ante transferencias, SIEMPRE llama."}], "explanation": "Business Email Compromise (BEC). El ataque más costoso del mundo. Siempre verifica transferencias por teléfono directo, sin importar quién ordena.", "legit_reason": null, "points": 200, "time_limit": 20}, {"id": 10, "level": 3, "isPhishing": false, "from_name": "Comunicaciones – MiEmpresa", "from_email": "comunicaciones@miempresa.com", "to": "empleado@miempresa.com", "date": "Hoy, 08:00 AM", "subject": "📰 Boletín Interno MiEmpresa | Junio 2024", "body_html": "\n<div class=\"em-header\" style=\"background:#00695c\">📰 Boletín Interno – Junio 2024</div>\n<div class=\"em-body\">\n  <p><strong>🏆 Noticias del mes</strong></p>\n  <p><strong>Nuevo cliente:</strong> MiEmpresa firmó contrato con Corporación XYZ por 12 meses.</p>\n  <p><strong>Reconocimientos:</strong> El equipo de ventas superó la meta Q2 en un 18%. ¡Felicitaciones!</p>\n  <hr style=\"border-color:#ddd;margin:12px 0\">\n  <p><strong>📅 Próximos eventos:</strong> 20 Jun: Reunión Q2 | 25 Jun: Día de integración | 30 Jun: Cierre contable</p>\n  <hr style=\"border-color:#ddd;margin:12px 0\">\n  <p><strong>💡 Tip de seguridad:</strong> El equipo de TI <u>nunca</u> solicitará su contraseña por correo. Reporte cualquier solicitud sospechosa a seguridad@miempresa.com.</p>\n  <p class=\"em-footer\">Para cancelar suscripción: Intranet → Comunicaciones</p>\n</div>", "red_flags": [], "explanation": "Boletín corporativo legítimo. Dominio oficial, sin solicitudes urgentes, desuscripción vía intranet.", "legit_reason": "Dominio corporativo · Contenido informativo · Sin acciones urgentes · Desuscripción en intranet", "points": 200, "time_limit": 20}, {"id": 11, "level": 3, "isPhishing": true, "from_name": "DocuSign", "from_email": "firma@docusign-esignature.net", "to": "empleado@miempresa.com", "date": "Hoy, 10:15 AM", "subject": "Documento pendiente: Actualización Contrato Laboral – Vence HOY", "body_html": "\n<div class=\"em-header\" style=\"background:#FFBE00;color:#333\">✍️ DocuSign – Gestión de Documentos</div>\n<div class=\"em-body\">\n  <p>Tiene un documento pendiente de firma de <strong>RRHH – MiEmpresa</strong>:</p>\n  <div class=\"em-info-box\" style=\"border-color:#FFBE00;background:#fffde7\">\n    📄 <strong>Documento:</strong> Actualización de términos contractuales 2024<br>\n    📤 <strong>Enviado por:</strong> María González (RRHH)<br>\n    ⏰ <strong>Vence:</strong> <span style=\"color:#cc0000\"><strong>Hoy, 5:00 PM</strong></span>\n  </div>\n  <p><strong>Por favor firme antes de las 5:00 PM para no afectar su próximo pago de nómina.</strong></p>\n  <div class=\"em-cta-wrap\"><a class=\"em-cta\" href=\"#\" style=\"background:#FFBE00;color:#333\">✍️ FIRMAR DOCUMENTO AHORA</a></div>\n  <p class=\"em-footer\">DocuSign, Inc. | Powered by DocuSign | docusign.com</p>\n</div>", "red_flags": [{"icon": "🌐", "title": "Dominio DocuSign falso", "desc": "DocuSign opera desde docusign.com o docusign.net oficial. 'docusign-esignature.net' es un dominio impostor."}, {"icon": "💰", "title": "Amenaza directa a la nómina", "desc": "Vincular la firma con el pago de salario es manipulación financiera. Los contratos no bloquean nóminas en horas."}, {"icon": "⏰", "title": "Vencimiento el mismo día", "desc": "Documentos contractuales con vencimiento de pocas horas son antinatural. Los documentos legales dan 48-72h mínimo."}, {"icon": "🔍", "title": "Verifica con RRHH directamente", "desc": "Ante cualquier solicitud de firma laboral, confirma con RRHH por teléfono antes de proceder."}], "explanation": "Phishing que abusa de plataformas de firma electrónica. La amenaza a la nómina explota una necesidad básica. Siempre verifica con RRHH antes de firmar.", "legit_reason": null, "points": 200, "time_limit": 20}, {"id": 12, "level": 3, "isPhishing": false, "from_name": "Gestión de Activos TI", "from_email": "licencias@miempresa.com", "to": "empleado@miempresa.com", "date": "Ayer, 03:00 PM", "subject": "Inventario de licencias software – Acción requerida (antes del viernes)", "body_html": "\n<div class=\"em-header\" style=\"background:#283593\">🖥️ TI – Gestión de Activos y Licencias</div>\n<div class=\"em-body\">\n  <p>Estimado equipo,</p>\n  <p>Iniciamos el proceso anual de <strong>renovación de licencias 2024–2025</strong>. Necesitamos su colaboración para completar el inventario de herramientas.</p>\n  <div class=\"em-info-box\" style=\"border-color:#283593;background:#e8eaf6\">\n    <strong>Acceso:</strong> Intranet → TI → Inventario de Software 2024<br>\n    <strong>Plazo:</strong> Viernes 21 de junio\n  </div>\n  <p>El formulario solicita únicamente: nombre del software, versión y frecuencia de uso.</p>\n  <p><strong>Nota:</strong> No es necesario proporcionar contraseñas ni claves de licencia.</p>\n  <p>Equipo TI | licencias@miempresa.com | Ext. 2250</p>\n</div>", "red_flags": [], "explanation": "Correo legítimo de TI. Redirige solo a intranet, explica exactamente qué se necesita, NO solicita contraseñas, plazo razonable.", "legit_reason": "Dominio corporativo · Solo intranet · Sin credenciales requeridas · Transparencia del proceso", "points": 200, "time_limit": 20}, {"id": 13, "level": 4, "isPhishing": true, "from_name": "LinkedIn", "from_email": "notifications@linkedin-messages.com", "to": "empleado@miempresa.com", "date": "Hoy, 12:30 PM", "subject": "Ana García de TechCorp quiere conectar contigo en LinkedIn", "body_html": "\n<div class=\"em-header\" style=\"background:#0077b5\">💼 LinkedIn</div>\n<div class=\"em-body\">\n  <div class=\"em-info-box\" style=\"border-color:#0077b5;background:#f3f6f8;display:flex;align-items:center;gap:15px\">\n    <div style=\"width:55px;height:55px;background:#0077b5;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:20px;flex-shrink:0\">AG</div>\n    <div><strong>Ana García</strong><br>Directora de RRHH | TechCorp<br><span style=\"color:#0077b5\">500+ conexiones en común</span></div>\n  </div>\n  <p><em>\"Hola, vi tu perfil y creo que podríamos colaborar. Tenemos una posición de liderazgo que podría interesarte. ¿Podemos hablar esta semana?\"</em></p>\n  <div class=\"em-cta-wrap\">\n    <a class=\"em-cta\" href=\"#\" style=\"background:#0077b5\">Aceptar invitación</a>\n    <a class=\"em-cta\" href=\"#\" style=\"background:#fff;color:#0077b5;border:2px solid #0077b5;margin-left:8px\">Ver perfil</a>\n  </div>\n  <p class=\"em-footer\">LinkedIn Corporation © 2024 | linkedin.com</p>\n</div>", "red_flags": [{"icon": "🌐", "title": "Dominio LinkedIn falso", "desc": "LinkedIn usa linkedin.com. 'linkedin-messages.com' es dominio impostor registrado para este ataque."}, {"icon": "🎣", "title": "Phishing de establecimiento de contacto", "desc": "Una vez aceptas, el atacante enviará malware o solicitará información confidencial desde LinkedIn."}, {"icon": "💼", "title": "Oferta laboral como cebo", "desc": "El atacante investigó tus aspiraciones profesionales previo al ataque (OSINT). Es spear phishing."}, {"icon": "📧", "title": "Accede directamente a linkedin.com", "desc": "Siempre verifica solicitudes accediendo directamente al sitio. Nunca desde botones en emails."}], "explanation": "Spear phishing por LinkedIn. Primero establece confianza y luego usa esa conexión para enviar malware o robar información.", "legit_reason": null, "points": 250, "time_limit": 18}, {"id": 14, "level": 4, "isPhishing": false, "from_name": "Ciberseguridad – MiEmpresa", "from_email": "seguridad@miempresa.com", "to": "empleado@miempresa.com", "date": "Hoy, 09:00 AM", "subject": "Actualización de seguridad: Windows Defender KB5034441 – Martes", "body_html": "\n<div class=\"em-header\" style=\"background:#e65100\">🛡️ Equipo de Ciberseguridad – MiEmpresa</div>\n<div class=\"em-body\">\n  <p>Estimado colaborador,</p>\n  <p>El <strong>martes 18 de junio</strong>, el sistema WSUS desplegará automáticamente la actualización de seguridad <strong>KB5034441</strong> en todos los equipos.</p>\n  <div class=\"em-info-box\" style=\"border-color:#e65100;background:#fff3e0\">\n    ✅ <strong>No es necesaria ninguna acción de su parte.</strong><br>\n    La actualización ocurrirá automáticamente durante el reinicio del sistema.\n  </div>\n  <p>Si experimenta problemas: abra ticket en helpdesk.miempresa.com o llame al Ext. 2200.</p>\n  <p>Esta comunicación fue aprobada por el CISO. Verifique su autenticidad en el portal de seguridad (intranet).</p>\n  <p>Equipo de Ciberseguridad | seguridad@miempresa.com | Ext. 2300</p>\n</div>", "red_flags": [], "explanation": "Comunicación legítima. Dominio corporativo, sin acción requerida, técnicamente específica (WSUS, KB real), verificable en intranet.", "legit_reason": "Dominio corporativo · Sin acción requerida · Técnicamente específico · Verificable en intranet", "points": 250, "time_limit": 18}, {"id": 15, "level": 4, "isPhishing": true, "from_name": "Servicio de Impuestos Internos", "from_email": "notificaciones@sii-tributario.org", "to": "empleado@miempresa.com", "date": "Hoy, 08:45 AM", "subject": "NOTIFICACIÓN OFICIAL: Reembolso de $2,340 pendiente de reclamación", "body_html": "\n<div class=\"em-header\" style=\"background:#1a237e\">🏛️ SERVICIO DE IMPUESTOS INTERNOS – Notificación Oficial</div>\n<div class=\"em-body\">\n  <p>Estimado contribuyente,</p>\n  <p>Tras revisar su declaración fiscal, tiene derecho a un <strong>reembolso de $2,340.00</strong> del período fiscal 2023.</p>\n  <div class=\"em-info-box\" style=\"border-color:#1a237e;background:#e8eaf6\">\n    Referencia: <strong>REF-2024-TX-88291</strong> | Monto: <strong>$2,340.00 USD</strong><br>\n    Estado: ✅ Aprobado – Pendiente de reclamación | Vencimiento: 30 días\n  </div>\n  <p>Para recibir su reembolso, verifique su identidad y proporcione sus <strong>datos bancarios</strong>:</p>\n  <div class=\"em-cta-wrap\"><a class=\"em-cta\" href=\"#\" style=\"background:#1a237e\">Reclamar mi Reembolso →</a></div>\n  <p class=\"em-footer\">Servicio de Impuestos Internos | Comunicación Oficial del Gobierno</p>\n</div>", "red_flags": [{"icon": "🌐", "title": "Dominio gubernamental falso", "desc": "Los servicios fiscales usan dominios .gov. 'sii-tributario.org' no es un dominio gubernamental legítimo."}, {"icon": "💰", "title": "Reembolso inesperado como cebo", "desc": "La promesa de dinero explota el pensamiento desiderativo. Si no esperabas un reembolso, sospecha."}, {"icon": "🏦", "title": "Datos bancarios por email", "desc": "Los organismos fiscales NUNCA piden datos bancarios por email. Los reembolsos usan información ya registrada."}, {"icon": "⏰", "title": "Vencimiento artificial de 30 días", "desc": "Urgencia fabricada para actuar antes de consultar con alguien. Los reembolsos legítimos no vencen así."}], "explanation": "Phishing tributario. Combina promesa de dinero con autoridad gubernamental. Objetivo: robar datos bancarios o credenciales fiscales.", "legit_reason": null, "points": 250, "time_limit": 18}, {"id": 16, "level": 4, "isPhishing": false, "from_name": "Amazon Web Services", "from_email": "billing@aws.amazon.com", "to": "empleado@miempresa.com", "date": "01 Jun 2024, 12:00 AM", "subject": "Your AWS bill for May 2024 is ready", "body_html": "\n<div class=\"em-header\" style=\"background:#232f3e\">☁️ Amazon Web Services – Billing</div>\n<div class=\"em-body\">\n  <p>Dear AWS Customer,</p>\n  <p>Your AWS invoice for May 2024 is now available.</p>\n  <div class=\"em-info-box\" style=\"background:#f5f5f5;border-color:#232f3e\">\n    <strong>Account ID:</strong> 123456789012<br>\n    <strong>Billing Period:</strong> May 1 – May 31, 2024<br>\n    <strong>Total Charges:</strong> $1,847.23 USD | <strong>Payment:</strong> Visa ending ****4521\n  </div>\n  <p>To view your invoice, sign in to the <strong>AWS Management Console</strong> at <em>console.aws.amazon.com</em>\n     → Billing &amp; Cost Management.</p>\n  <p>For questions: aws.amazon.com/billing or AWS Support through the console.<br>\n  Amazon Web Services | billing@aws.amazon.com</p>\n</div>", "red_flags": [], "explanation": "Factura legítima de AWS. Dominio oficial aws.amazon.com, datos parciales verificables (últimos 4 dígitos), acceso directo a consola sin enlace embebido.", "legit_reason": "Dominio AWS oficial · Datos parciales verificables · Sin enlace directo embebido · Instrucciones de acceso directo", "points": 250, "time_limit": 18}, {"id": 17, "level": 5, "isPhishing": true, "from_name": "GitHub Security", "from_email": "noreply@github-security.io", "to": "empleado@miempresa.com", "date": "Hoy, 09:23 AM", "subject": "Critical vulnerability in miempresa/core-api – CVE-2024-3094 (CVSS 10.0)", "body_html": "\n<div class=\"em-header\" style=\"background:#24292e\">🐙 GitHub Security Alert</div>\n<div class=\"em-body\">\n  <p>GitHub detected a <strong>critical vulnerability (CVE-2024-3094)</strong> in <strong>miempresa/core-api</strong>.</p>\n  <div class=\"em-info-box\" style=\"border-color:#ffc107;background:#fff3cd\">\n    🔴 <strong>CRITICAL – CVSS Score: 10.0</strong><br>\n    Package: xz-utils (5.6.0 / 5.6.1) | Impact: Remote Code Execution<br>\n    Repository: <strong>miempresa/core-api</strong> (branch: main)\n  </div>\n  <p>A malicious actor could exploit this to gain <strong>unauthorized access to your systems</strong>. Immediate remediation required.</p>\n  <div class=\"em-cta-wrap\"><a class=\"em-cta\" href=\"#\" style=\"background:#24292e\">View Security Advisory &amp; Patch</a></div>\n  <p class=\"em-footer\">GitHub, Inc. | github.com/security</p>\n</div>", "red_flags": [{"icon": "🌐", "title": "Dominio GitHub falso", "desc": "GitHub usa github.com o mail.github.com. 'github-security.io' es dominio falso registrado para atacar perfiles técnicos."}, {"icon": "🔬", "title": "CVE real usado como cebo", "desc": "CVE-2024-3094 es una vulnerabilidad real (backdoor XZ Utils). Los atacantes usan CVEs reales para dar credibilidad."}, {"icon": "🎯", "title": "Nombre de repositorio obtenido por OSINT", "desc": "'miempresa/core-api' fue encontrado por reconocimiento previo en GitHub público. Es spear phishing preparado."}, {"icon": "⚡", "title": "CVSS 10.0 genera urgencia técnica extrema", "desc": "Los desarrolladores actúan rápido ante críticas. Este sesgo profesional es exactamente lo que el atacante explota."}], "explanation": "Spear phishing técnico APT. El atacante conoce el repositorio, usa un CVE real y explota el instinto de respuesta inmediata de perfiles técnicos.", "legit_reason": null, "points": 300, "time_limit": 15}, {"id": 18, "level": 5, "isPhishing": false, "from_name": "Dropbox Business", "from_email": "no-reply@dropbox.com", "to": "empleado@miempresa.com", "date": "Hoy, 11:00 AM", "subject": "Laura Martínez shared 'Propuesta Q3 2024.pdf' with you", "body_html": "\n<div class=\"em-header\" style=\"background:#0061FF\">📁 Dropbox Business</div>\n<div class=\"em-body\">\n  <p><strong>Laura Martínez (l.martinez@miempresa.com)</strong> ha compartido un archivo contigo.</p>\n  <div class=\"em-info-box\" style=\"border-color:#0061FF;background:#f0f4ff;display:flex;align-items:center;gap:15px\">\n    <span style=\"font-size:36px\">📄</span>\n    <div><strong>Propuesta Q3 2024.pdf</strong><br>\n    Compartido por: l.martinez@miempresa.com | Tamaño: 2.4 MB | Modificado: Hoy</div>\n  </div>\n  <div class=\"em-cta-wrap\"><a class=\"em-cta\" href=\"#\" style=\"background:#0061FF\">Abrir en Dropbox</a></div>\n  <p class=\"em-footer\">Recibiste este email porque l.martinez@miempresa.com compartió un archivo desde Dropbox Business. | dropbox.com/privacy</p>\n</div>", "red_flags": [], "explanation": "Compartir legítimo de Dropbox. Dominio oficial, remitente del dominio corporativo, nombre de archivo específico y contextualmente relevante.", "legit_reason": "Dominio Dropbox oficial · Remitente del dominio corporativo · Nombre de archivo específico · Contexto relevante", "points": 300, "time_limit": 15}, {"id": 19, "level": 5, "isPhishing": true, "from_name": "Zoom", "from_email": "no-reply@zoom-webinar-invite.com", "to": "empleado@miempresa.com", "date": "Hoy, 08:00 AM", "subject": "Capacitación OBLIGATORIA – Cumplimiento y Ética Empresarial – HOY 3 PM", "body_html": "\n<div class=\"em-header\" style=\"background:#2D8CFF\">📹 Zoom Webinar – Convocatoria Oficial</div>\n<div class=\"em-body\">\n  <p>Ha sido convocado a una <strong>capacitación obligatoria</strong> de cumplimiento normativo.</p>\n  <div class=\"em-info-box\" style=\"border-color:#2D8CFF;background:#eff6ff\">\n    📋 <strong>Capacitación:</strong> Cumplimiento y Ética Empresarial 2024<br>\n    📅 <strong>Fecha:</strong> <span style=\"color:#cc0000\"><strong>Hoy, 3:00 PM – 5:00 PM</strong></span><br>\n    ⚠️ <strong>Asistencia:</strong> OBLIGATORIA – Afecta evaluación de desempeño\n  </div>\n  <p>Para unirse, complete el registro previo. El sistema <strong>solicitará sus credenciales corporativas</strong> para verificar que es empleado autorizado.</p>\n  <div class=\"em-cta-wrap\"><a class=\"em-cta\" href=\"#\" style=\"background:#2D8CFF\">Unirse a Zoom – Registro requerido</a></div>\n  <p class=\"em-footer\">Zoom Video Communications © 2024</p>\n</div>", "red_flags": [{"icon": "🌐", "title": "Dominio Zoom falso", "desc": "Zoom usa zoom.us. 'zoom-webinar-invite.com' es dominio falso. Cualquier otra URL es sospechosa."}, {"icon": "🔑", "title": "Zoom no pide credenciales corporativas", "desc": "Zoom nunca solicita las credenciales de tu empresa para unirte a una reunión. Es la trampa del phishing."}, {"icon": "⚖️", "title": "Coerción laboral (evaluación de desempeño)", "desc": "Vincular asistencia con evaluación elimina el pensamiento crítico. Táctica de ingeniería social avanzada."}, {"icon": "📅", "title": "Capacitación obligatoria comunicada el mismo día", "desc": "Una capacitación de compliance comunicada y celebrada el mismo día es operativamente imposible en entornos serios."}], "explanation": "Phishing de Zoom que combina autoridad + coerción laboral + urgencia. El objetivo de 'credenciales corporativas para verificar identidad' es el robo directo.", "legit_reason": null, "points": 300, "time_limit": 15}, {"id": 20, "level": 5, "isPhishing": false, "from_name": "Red Team – Ciberseguridad", "from_email": "redteam@miempresa.com", "to": "empleado@miempresa.com", "date": "Hoy, 10:00 AM", "subject": "Resultado de su prueba de phishing simulado – Informe personal disponible", "body_html": "\n<div class=\"em-header\" style=\"background:#1b5e20\">✅ Red Team – Ciberseguridad MiEmpresa</div>\n<div class=\"em-body\">\n  <p>Estimado colaborador,</p>\n  <p>Como parte del <strong>programa anual de seguridad</strong>, nuestro equipo realizó un <strong>ejercicio controlado de phishing simulado</strong> autorizado por la Dirección General.</p>\n  <p>Sus resultados individuales están disponibles en la intranet:</p>\n  <div class=\"em-info-box\" style=\"border-color:#1b5e20;background:#e8f5e9\">\n    <strong>Ruta:</strong> Intranet → Seguridad → Resultados Ejercicio Phishing 2024\n  </div>\n  <p>El informe incluye: correos simulados que recibió, señales de alerta, material de capacitación y comparativa anónima con el equipo.</p>\n  <p>Red Team – Ciberseguridad | redteam@miempresa.com | Ext. 2400<br>\n  <em>Ejercicio autorizado por: Roberto Sánchez, CEO | María López, CISO</em></p>\n</div>", "red_flags": [], "explanation": "Comunicación legítima del Red Team. Dominio corporativo, acceso solo en intranet, cadena de autorización explícita y verificable, sin solicitud de datos.", "legit_reason": "Dominio corporativo · Solo intranet · Autorización explícita verificable (CEO+CISO) · Sin solicitud de datos", "points": 300, "time_limit": 15}];
+
+const LEVELS = {
+  1:{name:'Amenazas Básicas',    color:'#00ff88'},
+  2:{name:'Nivel Intermedio',    color:'#4a9eff'},
+  3:{name:'Ataques Avanzados',   color:'#ff9f0a'},
+  4:{name:'Spear Phishing',      color:'#bf5af2'},
+  5:{name:'APT / Élite',         color:'#ff2d55'},
+};
+
+const BADGES = [
+  {id:'first',  ic:'🎮', nm:'Primera Misión',   ds:'Completar el primer correo'},
+  {id:'lvl1',   ic:'🎣', nm:'Cazador de Phish', ds:'Superar el Nivel 1'},
+  {id:'lvl3',   ic:'🔍', nm:'Detective Digital', ds:'Superar el Nivel 3'},
+  {id:'lvl5',   ic:'🏆', nm:'Agente PhishGuard', ds:'Completar los 5 niveles'},
+  {id:'combo5', ic:'🦅', nm:'Ojo de Águila',     ds:'5 aciertos consecutivos'},
+  {id:'speed',  ic:'⚡', nm:'Velocidad Máxima',  ds:'Responder en menos de 5 segundos'},
+  {id:'shield', ic:'🛡️', nm:'Escudo de Acero',  ds:'Nivel completo sin perder vidas'},
+  {id:'elite',  ic:'💎', nm:'Gran Maestro',       ds:'Puntuación final mayor a 4,500 pts'},
+];
+
+const RANKS = [
+  {min:0,    label:'Aprendiz',         color:'#5a7aaa', bg:'rgba(90,122,170,.15)'},
+  {min:1000, label:'Analista',         color:'#00e5ff', bg:'rgba(0,229,255,.12)'},
+  {min:2000, label:'Investigador',     color:'#00ff88', bg:'rgba(0,255,136,.12)'},
+  {min:3000, label:'Especialista',     color:'#ff9f0a', bg:'rgba(255,159,10,.12)'},
+  {min:3800, label:'Experto',          color:'#bf5af2', bg:'rgba(191,90,242,.12)'},
+  {min:4400, label:'Agente de Élite',  color:'#ffd60a', bg:'rgba(255,214,10,.15)'},
+];
+
+// ──────────────────────────────────────────────────────────
+//  STARS BACKGROUND
+// ──────────────────────────────────────────────────────────
+(function(){
+  const c=document.getElementById('stars-bg'),ctx=c.getContext('2d');
+  let W,H,pts=[];
+  function resize(){W=c.width=innerWidth;H=c.height=innerHeight;}
+  function init(){pts=[];for(let i=0;i<160;i++)pts.push({x:Math.random()*W,y:Math.random()*H,r:Math.random()*1.6+.3,a:Math.random(),da:(Math.random()*.012+.003)*(Math.random()<.5?1:-1)});}
+  function draw(){ctx.clearRect(0,0,W,H);pts.forEach(p=>{p.a=Math.max(0,Math.min(1,p.a+p.da));if(p.a<=0||p.a>=1)p.da*=-1;ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fillStyle=`rgba(0,229,255,${p.a*.55})`;ctx.fill();});requestAnimationFrame(draw);}
+  window.addEventListener('resize',()=>{resize();init();});
+  resize();init();draw();
+})();
+
+// ──────────────────────────────────────────────────────────
+//  HELPERS
+// ──────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+const showScr = id => {document.querySelectorAll('.scr').forEach(s=>s.classList.remove('on'));$(id).classList.add('on');};
+
+function shuffle(arr){
+  const a=[...arr];
+  for(let i=a.length-1;i>0;i--){const j=0|Math.random()*(i+1);[a[i],a[j]]=[a[j],a[i]];}
+  return a;
+}
+
+function toast(msg,type='c',ms=3000){
+  const t=document.createElement('div');
+  t.className=`toast t${type}`;t.textContent=msg;
+  $('toasts').appendChild(t);
+  setTimeout(()=>{t.style.opacity='0';t.style.transition='opacity .3s';setTimeout(()=>t.remove(),300);},ms);
+}
+
+function livesHTML(n){
+  let h='';for(let i=0;i<3;i++)h+=i<n?'❤️':'🖤';return h;
+}
+
+function getRank(score){
+  let r=RANKS[0];
+  for(const rk of RANKS)if(score>=rk.min)r=rk;
+  return r;
+}
+
+// ──────────────────────────────────────────────────────────
+//  GAME ENGINE
+// ──────────────────────────────────────────────────────────
+const G = (function(){
+
+  // ─── STATE ──────────────────────────────────────────────
+  let st={};
+
+  function initState(){
+    st={
+      score:0, lives:3, combo:0, maxCombo:0,
+      correct:0, wrong:0,
+      totalPhish:0, caughtPhish:0, missedPhish:0,
+      falsePos:0,
+      badges:new Set(),
+      lvl:1,
+      lvlEmails:[],        // shuffled emails for current level
+      lvlIdx:0,            // current email index in level
+      lvlStats:[],         // per-level stat records
+      lvlCorrect:0, lvlWrong:0, lvlShield:true,
+      prevLvlScore:0,
+      timer:null, timeLeft:30,
+      t0:0,                // timestamp of email load
+      answered:false,
+    };
+  }
+
+  // ─── SHUFFLE PER LEVEL ──────────────────────────────────
+  function emailsForLevel(lvl){
+    return shuffle(EMAILS_RAW.filter(e=>e.level===lvl));
+  }
+
+  // ─── HUD ─────────────────────────────────────────────────
+  function hudShow(on){$('hud').style.display=on?'flex':'none';}
+  function barShow(on){$('action-bar').style.display=on?'flex':'none';}
+
+  function hudUpdate(){
+    $('hval-score').textContent = st.score.toLocaleString();
+    $('hval-level').textContent = st.lvl;
+    const m=comboMult();
+    const ce=$('hval-combo');
+    ce.textContent=`×${m.toFixed(1)}`;
+    ce.style.color=st.combo>=5?'#ff2d55':st.combo>=3?'#ff9f0a':'#ffd60a';
+    if(st.combo>0){ce.classList.remove('combo-anim');void ce.offsetWidth;ce.classList.add('combo-anim');}
+    $('hval-lives').textContent=livesHTML(st.lives);
+    const pct=(st.lvlIdx/st.lvlEmails.length)*100;
+    $('hval-prog').style.width=pct+'%';
+  }
+
+  function comboMult(){
+    if(st.combo>=5)return 3;
+    if(st.combo>=3)return 2;
+    if(st.combo>=2)return 1.5;
+    return 1;
+  }
+
+  // ─── TIMER ──────────────────────────────────────────────
+  function timerStart(secs){
+    timerStop();
+    st.timeLeft=secs;
+    $('hval-timer').textContent=secs;
+    $('hval-timer').classList.remove('timer-warn');
+    st.timer=setInterval(()=>{
+      st.timeLeft--;
+      $('hval-timer').textContent=st.timeLeft;
+      if(st.timeLeft<=5)$('hval-timer').classList.add('timer-warn');
+      if(st.timeLeft<=0){timerStop();if(!st.answered)timedOut();}
+    },1000);
+  }
+  function timerStop(){
+    clearInterval(st.timer);
+    $('hval-timer').classList.remove('timer-warn');
+  }
+
+  function timedOut(){
+    if(st.answered)return;
+    st.answered=true;
+    btnDisable();
+    toast('⏰ ¡Tiempo agotado!','r');
+    const email=st.lvlEmails[st.lvlIdx];
+    st.wrong++;st.lvlWrong++;st.combo=0;st.lvlShield=false;
+    if(email.isPhishing)st.missedPhish++;
+    loseLife();
+    hudUpdate();
+    showModal(false,email,-100,0,1,'timeout');
+  }
+
+  // ─── LOAD EMAIL ─────────────────────────────────────────
+  function loadEmail(){
+    const email=st.lvlEmails[st.lvlIdx];
+    if(!email){levelEnd();return;}
+    st.answered=false;
+    st.t0=Date.now();
+
+    // Banner
+    $('b-lvl').textContent=st.lvl;
+    $('b-diff').textContent=LEVELS[st.lvl].name;
+    $('b-cur').textContent=st.lvlIdx+1;
+    $('b-tot').textContent=st.lvlEmails.length;
+    $('tb-lbl').textContent=`📥 Bandeja — Correo ${st.lvlIdx+1}/${st.lvlEmails.length} — Nivel ${st.lvl}`;
+
+    // Meta
+    $('email-meta').innerHTML=`
+      <div class="ef"><span class="ef-k">De:</span><span class="ef-v"><strong>${email.from_name}</strong> &lt;${email.from_email}&gt;</span></div>
+      <div class="ef"><span class="ef-k">Para:</span><span class="ef-v">${email.to}</span></div>
+      <div class="ef"><span class="ef-k">Fecha:</span><span class="ef-v">${email.date}</span></div>`;
+    $('email-subj').textContent=email.subject;
+    $('email-body').innerHTML=email.body_html;
+
+    if(email.isPhishing)st.totalPhish++;
+
+    hudUpdate();
+    timerStart(email.time_limit);
+    btnEnable();
+    badgeCheck('first');
+  }
+
+  // ─── CLASSIFY ───────────────────────────────────────────
+  function pick(isPhish){
+    if(st.answered)return;
+    st.answered=true;
+    timerStop();
+    btnDisable();
+
+    const email=st.lvlEmails[st.lvlIdx];
+    const ok=(isPhish===email.isPhishing);
+    const timeTaken=(Date.now()-st.t0)/1000;
+    const tBonus=ok?Math.round(Math.max(0,st.timeLeft)*2):0;
+    const mult=comboMult();
+    let pts=0;
+
+    if(ok){
+      pts=Math.round((email.points+tBonus)*mult);
+      st.score+=pts;st.correct++;st.lvlCorrect++;st.combo++;
+      st.maxCombo=Math.max(st.maxCombo,st.combo);
+      if(email.isPhishing)st.caughtPhish++;
+      if(timeTaken<5)badgeCheck('speed');
+      if(st.combo>=5)badgeCheck('combo5');
+    }else{
+      pts=email.isPhishing?-100:-75;
+      st.score=Math.max(0,st.score+pts);
+      st.wrong++;st.lvlWrong++;st.combo=0;st.lvlShield=false;
+      if(email.isPhishing&&!isPhish)st.missedPhish++;
+      if(!email.isPhishing&&isPhish)st.falsePos++;
+      loseLife();
+    }
+
+    hudUpdate();
+    showModal(ok,email,pts,tBonus,mult,ok?'ok':'fail');
+  }
+
+  function loseLife(){
+    st.lives--;
+    $('hud').style.animation='none';void $('hud').offsetWidth;
+    $('hud').style.animation='hudFlash .5s ease';
+    setTimeout(()=>{$('hud').style.animation='';},500);
+  }
+
+  // ─── MODAL ──────────────────────────────────────────────
+  function showModal(ok,email,pts,tBonus,mult,reason){
+    // Header
+    const isTimeout=(reason==='timeout');
+    let ico,verd,ptsText,hdrBorder;
+    if(isTimeout){
+      ico='⏰';verd='TIEMPO AGOTADO';hdrBorder='rgba(255,159,10,.4)';
+      ptsText=`−100 pts · Vida perdida`;
+    }else if(ok){
+      ico=email.isPhishing?'🎯':'🛡️';
+      verd=email.isPhishing?'¡PHISHING DETECTADO!':'¡CORREO LEGÍTIMO!';
+      hdrBorder='rgba(0,255,136,.35)';
+      ptsText=`+${pts} pts (base ${email.points} + tiempo ${tBonus} × combo ${mult.toFixed(1)})`;
+    }else{
+      ico='⚠️';
+      verd=email.isPhishing?'PHISHING NO DETECTADO':'FALSO POSITIVO';
+      hdrBorder='rgba(255,45,85,.4)';
+      ptsText=`${pts} pts · Vida perdida`;
+    }
+    $('modal-ico').textContent=ico;
+    $('modal-verd').textContent=verd;
+    $('modal-verd').style.color=ok&&!isTimeout?'var(--green)':'var(--red)';
+    $('modal-pts').textContent=ptsText;
+    $('modal-hdr').style.borderBottomColor=hdrBorder;
+
+    // Body
+    let html=`<div class="modal-expl">${email.explanation}</div>`;
+    if(email.isPhishing&&email.red_flags&&email.red_flags.length){
+      html+=`<div class="flags-hdr">🚩 Señales de Alerta en este Correo</div>`;
+      email.red_flags.forEach(f=>{
+        html+=`<div class="flag"><div class="flag-ic">${f.icon}</div>
+          <div><div class="flag-ti">${f.title}</div><div class="flag-ds">${f.desc}</div></div></div>`;
+      });
+    }
+    if(!email.isPhishing&&email.legit_reason){
+      html+=`<div class="legit-box">✅ <strong>¿Por qué es legítimo?</strong><br>${email.legit_reason}</div>`;
+    }
+    $('modal-body').innerHTML=html;
+    $('modal').classList.add('on');
+  }
+
+  function next(){
+    $('modal').classList.remove('on');
+    if(st.lives<=0){setTimeout(gameOver,280);return;}
+    st.lvlIdx++;
+    if(st.lvlIdx>=st.lvlEmails.length){setTimeout(levelEnd,280);}
+    else{setTimeout(loadEmail,280);}
+  }
+
+  // ─── LEVEL END ───────────────────────────────────────────
+  function levelEnd(){
+    timerStop();
+    const lvl=st.lvl;
+    const lvlPts=st.score-st.prevLvlScore;
+
+    // record
+    st.lvlStats.push({
+      lvl,
+      correct:st.lvlCorrect,
+      wrong:st.lvlWrong,
+      combo:st.maxCombo,
+      pts:lvlPts,
+      total:st.lvlEmails.length,
+    });
+
+    // badges
+    if(lvl===1)badgeCheck('lvl1');
+    if(lvl===3)badgeCheck('lvl3');
+    if(lvl===5){badgeCheck('lvl5');if(st.score>=4500)badgeCheck('elite');}
+    if(st.lvlShield)badgeCheck('shield');
+
+    hudShow(false);barShow(false);
+
+    // last level → victory
+    if(lvl===5){setTimeout(victory,280);return;}
+
+    // show level screen
+    $('lc-ico').textContent='✅';
+    $('lc-title').textContent=`NIVEL ${lvl} SUPERADO`;
+    $('lc-title').className='lc-title';
+    $('lc-title').style.color=LEVELS[lvl].color;
+    $('lc-sub').textContent=`NIVEL ${lvl} — ${LEVELS[lvl].name.toUpperCase()}`;
+    $('lc-grid').innerHTML=`
+      <div class="lcs"><div class="lcs-v" style="color:var(--green)">${st.lvlCorrect}</div><div class="lcs-l">Aciertos</div></div>
+      <div class="lcs"><div class="lcs-v" style="color:var(--red)">${st.lvlWrong}</div><div class="lcs-l">Errores</div></div>
+      <div class="lcs"><div class="lcs-v" style="color:var(--cyan)">${lvlPts.toLocaleString()}</div><div class="lcs-l">Pts Nivel</div></div>
+      <div class="lcs"><div class="lcs-v" style="color:var(--yellow)">×${st.maxCombo}</div><div class="lcs-l">Combo Máx.</div></div>`;
+
+    // latest badge
+    const lastBdgId=[...st.badges].slice(-1)[0];
+    const lb=BADGES.find(b=>b.id===lastBdgId);
+    const lbEl=$('lc-badge');
+    if(lb){
+      lbEl.style.display='block';
+      lbEl.innerHTML=`<div class="be-ic">${lb.ic}</div><div class="be-nm">${lb.nm}</div><div class="be-ds">${lb.ds}</div>`;
+    }else{lbEl.style.display='none';}
+
+    showScr('s-level');
+  }
+
+  // ─── NEXT LEVEL ──────────────────────────────────────────
+  function nextLevel(){
+    st.lvl++;
+    st.lvlIdx=0;
+    st.lvlCorrect=0;st.lvlWrong=0;st.lvlShield=true;
+    st.prevLvlScore=st.score;
+    st.lvlEmails=emailsForLevel(st.lvl); // ← ALEATORIO en cada nivel
+    hudShow(true);barShow(true);
+    showScr('s-game');
+    loadEmail();
+    hudUpdate();
+    toast(`🎯 Nivel ${st.lvl} — ${LEVELS[st.lvl].name}`,'c');
+  }
+
+  // ─── GAME OVER ───────────────────────────────────────────
+  function gameOver(){
+    timerStop();hudShow(false);barShow(false);
+    $('go-score').textContent=st.score.toLocaleString();
+    // summary
+    const pct=st.correct>0?Math.round((st.correct/(st.correct+st.wrong))*100):0;
+    $('go-summary').innerHTML=`
+      <div class="go-sum-row"><span class="k">Correos analizados</span><span class="v">${st.correct+st.wrong}</span></div>
+      <div class="go-sum-row"><span class="k">Aciertos</span><span class="v" style="color:var(--green)">${st.correct} (${pct}%)</span></div>
+      <div class="go-sum-row"><span class="k">Errores</span><span class="v" style="color:var(--red)">${st.wrong}</span></div>
+      <div class="go-sum-row"><span class="k">Phishing detectado</span><span class="v">${st.caughtPhish}/${st.totalPhish}</span></div>
+      <div class="go-sum-row"><span class="k">Falsos positivos</span><span class="v">${st.falsePos}</span></div>
+      <div class="go-sum-row"><span class="k">Combo máximo</span><span class="v">×${st.maxCombo}</span></div>
+      <div class="go-sum-row"><span class="k">Nivel alcanzado</span><span class="v">${st.lvl} / 5</span></div>
+    `;
+    showScr('s-gameover');
+  }
+
+  // ─── VICTORY ─────────────────────────────────────────────
+  function victory(){
+    timerStop();hudShow(false);barShow(false);
+    // fire confetti-like toasts
+    setTimeout(()=>toast('🎉 ¡Misión completada!','g'),100);
+    setTimeout(()=>toast('🏆 ¡Todos los niveles superados!','y'),700);
+    if(st.score>=4500)setTimeout(()=>toast('💎 ¡Gran Maestro desbloqueado!','c'),1400);
+
+    $('vc-score').textContent=st.score.toLocaleString();
+
+    // rank
+    const rank=getRank(st.score);
+    const rb=$('vc-rank');
+    rb.textContent=`🏅 Rango: ${rank.label}`;
+    rb.style.background=rank.bg;
+    rb.style.color=rank.color;
+    rb.style.border=`1px solid ${rank.color}40`;
+
+    // results table
+    const tbody=$('rt-rows');
+    tbody.innerHTML='';
+    let totC=0,totW=0,totP=0;
+    st.lvlStats.forEach(s=>{
+      totC+=s.correct;totW+=s.wrong;totP+=s.pts;
+      const acc=Math.round((s.correct/s.total)*100);
+      const row=document.createElement('div');row.className='rt-row';
+      row.innerHTML=`
+        <div style="font-weight:700;color:${LEVELS[s.lvl].color}">Nivel ${s.lvl}</div>
+        <div style="font-size:11px;color:var(--dim)">${LEVELS[s.lvl].name}</div>
+        <div style="text-align:center;color:var(--green);font-weight:700">${s.correct}</div>
+        <div style="text-align:center;color:var(--red);font-weight:700">${s.wrong}</div>
+        <div style="text-align:center;color:var(--yellow)">×${s.combo}</div>
+        <div style="text-align:right;color:var(--cyan);font-weight:700;font-family:var(--mono)">${s.pts.toLocaleString()}</div>`;
+      tbody.appendChild(row);
+    });
+    // total row
+    const acc=totC+totW>0?Math.round((totC/(totC+totW))*100):0;
+    const total=document.createElement('div');total.className='rt-total';
+    total.innerHTML=`
+      <div style="color:var(--dim)">TOTAL</div>
+      <div style="color:var(--dim);font-size:11px">Precisión: ${acc}%</div>
+      <div style="text-align:center;color:var(--green)">${totC}</div>
+      <div style="text-align:center;color:var(--red)">${totW}</div>
+      <div style="text-align:center"></div>
+      <div style="text-align:right;color:var(--cyan);font-family:var(--mono)">${st.score.toLocaleString()}</div>`;
+    tbody.appendChild(total);
+
+    // badges
+    const bg=$('vc-badges');bg.innerHTML='';
+    if(st.badges.size===0){
+      bg.innerHTML='<div style="color:var(--dim);font-size:12px">Sin insignias esta partida. ¡Inténtalo de nuevo!</div>';
+    }else{
+      st.badges.forEach(id=>{
+        const b=BADGES.find(x=>x.id===id);
+        if(b)bg.innerHTML+=`<div class="bg-card"><span class="bi">${b.ic}</span>${b.nm}</div>`;
+      });
+    }
+
+    showScr('s-victory');
+  }
+
+  // ─── BADGES ─────────────────────────────────────────────
+  function badgeCheck(id){
+    if(st.badges.has(id))return;
+    st.badges.add(id);
+    const b=BADGES.find(x=>x.id===id);
+    if(!b)return;
+    const el=document.createElement('div');
+    el.className='bdg-mini';el.title=b.nm;el.textContent=b.ic;
+    $('hud-badges').appendChild(el);
+    toast(`🏅 Insignia: ${b.nm}`,'y',3500);
+  }
+
+  // ─── BUTTONS ─────────────────────────────────────────────
+  function btnEnable(){$('btn-phish').disabled=false;$('btn-legit').disabled=false;}
+  function btnDisable(){$('btn-phish').disabled=true;$('btn-legit').disabled=true;}
+
+  // ─── PUBLIC API ──────────────────────────────────────────
+  function start(){
+    initState();
+    st.lvlEmails=emailsForLevel(1); // ← ALEATORIO nivel 1
+    st.prevLvlScore=0;
+    hudShow(true);barShow(true);
+    $('hud-badges').innerHTML='';
+    hudUpdate();
+    showScr('s-game');
+    loadEmail();
+  }
+
+  function restart(){start();}
+  function intro(){timerStop();hudShow(false);barShow(false);showScr('s-intro');}
+
+  // ─── KEYBOARD ────────────────────────────────────────────
+  document.addEventListener('keydown',e=>{
+    const k=e.key.toLowerCase();
+    if($('s-game').classList.contains('on')&&!st.answered){
+      if(k==='f')pick(true);
+      if(k==='l')pick(false);
+    }
+    if($('modal').classList.contains('on')){
+      if(k==='enter'||k===' ')next();
+    }
+    if($('s-level').classList.contains('on')){
+      if(k==='enter'||k===' ')nextLevel();
+    }
+  });
+
+  return {start,restart,intro,pick,next,nextLevel};
+})();
+</script>
+</body>
+</html>
