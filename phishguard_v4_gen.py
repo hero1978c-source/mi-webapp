@@ -1,11 +1,431 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PhishGuard v4 – Operación Bandeja de Entrada</title>
-<style>
+#!/usr/bin/env python3
+"""
+PhishGuard v4.0 – Generador de código
+Genera PhishGuard_v4.html en el directorio actual.
+Uso:  python phishguard_v4_gen.py
+"""
+import json
+from pathlib import Path
 
+# ══════════════════════════════════════════════════════════
+#  DATOS: 26 ESCENARIOS DE EMAIL
+# ══════════════════════════════════════════════════════════
+EMAILS = [
+# ── NIVEL 1: AMENAZAS BÁSICAS ─────────────────────────────
+{
+  "id":1,"level":1,"isPhishing":True,
+  "from_name":"Soporte Banco Nacional","from_email":"soporte@banconacional-seguridad.xyz",
+  "to":"empleado@miempresa.com","date":"Hoy, 09:14 AM",
+  "subject":"⚠️ URGENTE: Su cuenta ha sido SUSPENDIDA – Actúe AHORA",
+  "body_html":'<div class="em-header" style="background:#003087">🏦 BANCO NACIONAL – Seguridad</div><div class="em-body"><p>Estimado cliente,</p><p><strong style="color:#cc0000">⚠️ SU CUENTA HA SIDO SUSPENDIDA TEMPORALMENTE</strong></p><p>Hemos detectado actividad <strong>SOSPECHOSA</strong>. Debe verificar en las próximas <strong style="color:#cc0000">2 HORAS</strong> o su cuenta será <u>cerrada permanentemente</u>.</p><div class="em-cta-wrap"><a class="em-cta" href="#" style="background:#003087">🔓 VERIFICAR MI CUENTA AHORA</a></div><p>Necesitará: número de cuenta, contraseña, tarjeta y CVV.</p><p class="em-footer">Si no actúa, su cuenta será eliminada. Este es su único aviso.</p></div>',
+  "red_flags":[
+    {"icon":"🌐","title":"Dominio falso (.xyz)","desc":"Los bancos nunca usan extensiones .xyz. El dominio real es verificable en la web oficial."},
+    {"icon":"⏰","title":"Urgencia artificial","desc":"'2 HORAS' es manipulación psicológica. Los bancos reales notifican con días de antelación."},
+    {"icon":"🔑","title":"Solicitud de datos críticos","desc":"Ningún banco legítimo pide contraseña y CVV por correo. Siempre es trampa."},
+    {"icon":"📢","title":"MAYÚSCULAS y amenazas","desc":"Uso de mayúsculas, exclamaciones y amenazas de cierre son ingeniería social clásica."},
+  ],
+  "explanation":"Phishing bancario clásico. Dominio falso + urgencia + datos sensibles. Los bancos reales NUNCA piden CVV por email.",
+  "legit_reason":None,"points":100,"time_limit":30,
+},
+{
+  "id":2,"level":1,"isPhishing":False,
+  "from_name":"IT Support – MiEmpresa","from_email":"soporte.ti@miempresa.com",
+  "to":"empleado@miempresa.com","date":"Hoy, 10:30 AM",
+  "subject":"Mantenimiento programado de sistemas – Sábado 02:00–04:00 AM",
+  "body_html":'<div class="em-header" style="background:#1a237e">💻 Departamento de TI – MiEmpresa</div><div class="em-body"><p>Estimado equipo,</p><p>El próximo <strong>sábado 15 de junio</strong> realizaremos mantenimiento preventivo.</p><p><strong>Horario:</strong> 02:00 AM – 04:00 AM</p><ul><li>Correo electrónico corporativo</li><li>VPN corporativa</li><li>Intranet y recursos compartidos</li></ul><p>No es necesario realizar ninguna acción. Para consultas: <strong>ext. 2200</strong>.</p><p><strong>Equipo de TI</strong> | soporte.ti@miempresa.com</p></div>',
+  "red_flags":[],"explanation":"Correo legítimo de TI. Dominio corporativo oficial, sin datos sensibles, canales verificables.",
+  "legit_reason":"Dominio corporativo oficial · Sin solicitud de credenciales · Canales internos verificables",
+  "points":100,"time_limit":30,
+},
+{
+  "id":3,"level":1,"isPhishing":True,
+  "from_name":"Amazon","from_email":"noreply@amazon-confirmaciones-pedidos.net",
+  "to":"empleado@miempresa.com","date":"Ayer, 11:45 PM",
+  "subject":"Pedido #AMZ-8847291 – Confirme su dirección URGENTE",
+  "body_html":'<div class="em-header" style="background:#ff9900;color:#232f3e">📦 amazon – Confirmación de Pedido</div><div class="em-body"><p>Hemos procesado su pedido pero necesitamos confirmar su dirección de entrega.</p><div class="em-info-box" style="border-color:#ff9900;background:#fff8ee"><strong>Pedido #AMZ-8847291</strong><br>iPhone 15 Pro Max 256GB | Total: $1,299.99 USD<br>Estado: <span style="color:#e67e00">⚠️ Pendiente de confirmación</span></div><p><strong>Si no confirma en 24 horas, el pedido será cancelado y se realizará el cargo de todas formas.</strong></p><div class="em-cta-wrap"><a class="em-cta" href="#" style="background:#ff9900;color:#232f3e">Confirmar Dirección y Datos de Pago</a></div><p class="em-footer">Amazon.com © 2024</p></div>',
+  "red_flags":[
+    {"icon":"🌐","title":"Dominio impostor","desc":"Amazon usa amazon.com. 'amazon-confirmaciones-pedidos.net' es un dominio de atacantes."},
+    {"icon":"🛒","title":"Pedido no solicitado","desc":"El atacante espera que hagas clic para 'cancelarlo'. Ambas opciones capturan credenciales."},
+    {"icon":"💳","title":"Solicitud de datos de pago","desc":"Amazon nunca pide datos de pago por email para pedidos ya procesados."},
+    {"icon":"⚠️","title":"Contradicción lógica","desc":"'Cancelado pero con cargo de todas formas' es amenaza ilógica diseñada para generar pánico."},
+  ],
+  "explanation":"Phishing de Amazon con pedido falso de alto valor. Objetivo: robar credenciales mientras intentas 'cancelar' el cargo.",
+  "legit_reason":None,"points":100,"time_limit":30,
+},
+{
+  "id":4,"level":1,"isPhishing":False,
+  "from_name":"María González – RRHH","from_email":"m.gonzalez@miempresa.com",
+  "to":"empleado@miempresa.com","date":"Hoy, 08:15 AM",
+  "subject":"Recordatorio: Encuesta de Clima Laboral 2024 – Vence el viernes",
+  "body_html":'<div class="em-header" style="background:#2e7d32">👥 Recursos Humanos – MiEmpresa</div><div class="em-body"><p>Estimado colaborador,</p><p>Le recordamos que la <strong>Encuesta Anual de Clima Laboral 2024</strong> cierra el próximo <strong>viernes 19 de junio</strong>.</p><p>La encuesta es completamente <strong>anónima</strong> y toma aproximadamente 10 minutos.</p><div class="em-info-box" style="border-color:#2e7d32;background:#f1f8e9"><strong>Acceso:</strong> Intranet → Recursos Humanos → Encuesta Clima 2024</div><p>El <strong>67% del equipo</strong> ya ha participado.<br><strong>María González</strong> – Analista RRHH | Ext. 1045</p></div>',
+  "red_flags":[],"explanation":"Correo legítimo de RRHH. Dominio corporativo, sin credenciales, acceso vía intranet, contacto verificable.",
+  "legit_reason":"Dominio corporativo · Acceso solo por intranet · Sin datos sensibles · Contacto interno verificable",
+  "points":100,"time_limit":30,
+},
+# ── NIVEL 2: NIVEL INTERMEDIO ─────────────────────────────
+{
+  "id":5,"level":2,"isPhishing":True,
+  "from_name":"IT Helpdesk Corporativo","from_email":"helpdesk@miempresa-support.com",
+  "to":"empleado@miempresa.com","date":"Hoy, 07:58 AM",
+  "subject":"Acción requerida: Su contraseña corporativa expira en 24 horas",
+  "body_html":'<div class="em-header" style="background:#37474f">🔐 IT Helpdesk – Seguridad Corporativa</div><div class="em-body"><p>Estimado empleado,</p><p>Nuestros sistemas detectaron que su contraseña corporativa <strong>expirará en 24 horas</strong>. Sin acción, perderá acceso a <u>todos</u> los sistemas.</p><div class="em-info-box" style="border-color:#ff9800;background:#fff3e0">⚠️ <strong>Acción requerida antes de:</strong> Mañana 08:00 AM</div><p>Ingrese sus credenciales actuales y defina una nueva contraseña:</p><div class="em-cta-wrap"><a class="em-cta" href="#" style="background:#37474f">🔑 Actualizar Contraseña Ahora</a></div><p class="em-footer">IT Security Team | No responda a este correo</p></div>',
+  "red_flags":[
+    {"icon":"🌐","title":"Typosquatting (dominio casi idéntico)","desc":"'miempresa-support.com' vs 'miempresa.com'. Verifica siempre el dominio exacto."},
+    {"icon":"🔑","title":"Trampa de credenciales","desc":"El portal pedirá tu contraseña ACTUAL. IT real nunca necesita tu clave vigente para un reset."},
+    {"icon":"⏰","title":"Urgencia de 24h fabricada","desc":"Las políticas de expiración se notifican con varios días y desde el propio sistema operativo."},
+    {"icon":"📧","title":"'Estimado empleado' sin nombre","desc":"Un sistema corporativo real conoce tu nombre. El saludo genérico indica campaña masiva."},
+  ],
+  "explanation":"Phishing de credenciales que imita al IT. Typosquatting sutil + urgencia. Objetivo: robar tu contraseña corporativa.",
+  "legit_reason":None,"points":150,"time_limit":25,
+},
+{
+  "id":6,"level":2,"isPhishing":False,
+  "from_name":"Facturación – Proveedor ABC","from_email":"facturas@proveedorabc.com",
+  "to":"empleado@miempresa.com","date":"Ayer, 04:22 PM",
+  "subject":"Factura #FAC-2024-0445 – Servicios de Consultoría Junio 2024",
+  "body_html":'<div class="em-header" style="background:#1565c0">📄 Proveedor ABC S.A. – Facturación</div><div class="em-body"><p>Estimado equipo de MiEmpresa,</p><p>Adjuntamos la factura de servicios de junio 2024, según contrato <strong>#CM-2023-089</strong>.</p><div class="em-info-box" style="border-color:#1565c0;background:#e3f2fd">Número: <strong>FAC-2024-0445</strong> | Período: 01/06/2024 – 30/06/2024<br>Concepto: Consultoría en gestión de proyectos<br>Monto: $4,500.00 + IVA | Vencimiento: 30/07/2024</div><p>Para consultas: facturas@proveedorabc.com | Tel: +1 (555) 234-5678</p><p><strong>Dept. de Facturación</strong> – Proveedor ABC S.A.</p></div>',
+  "red_flags":[],"explanation":"Factura legítima. Referencia a contrato específico, múltiples canales verificables, sin urgencia.",
+  "legit_reason":"Referencia a contrato existente · Sin urgencia · Múltiples canales verificables · Sin solicitud de credenciales",
+  "points":150,"time_limit":25,
+},
+{
+  "id":7,"level":2,"isPhishing":True,
+  "from_name":"Microsoft 365 Security","from_email":"security-alert@microsoft365-secure-team.com",
+  "to":"empleado@miempresa.com","date":"Hoy, 06:33 AM",
+  "subject":"Alerta: Inicio de sesión desde ubicación desconocida – Moscú, Rusia",
+  "body_html":'<div class="em-header" style="background:#0078d4">🪟 Microsoft 365 Security Alert</div><div class="em-body"><p>Detectamos un inicio de sesión inusual en su cuenta:</p><div class="em-info-box" style="border-color:#ffc107;background:#fff3cd">📍 <strong>Ubicación:</strong> Moscú, Rusia<br>🕐 <strong>Hora:</strong> 06:28 AM (hace 5 minutos)<br>💻 <strong>Dispositivo:</strong> Windows PC desconocido</div><p>Si no fue usted, tome acción <strong>inmediata</strong>:</p><div class="em-cta-wrap"><a class="em-cta" href="#" style="background:#d32f2f;margin-right:8px">🔒 Asegurar mi Cuenta</a><a class="em-cta" href="#" style="background:#0078d4">✅ Fui Yo</a></div><p class="em-footer">Microsoft Corporation © 2024</p></div>',
+  "red_flags":[
+    {"icon":"🌐","title":"Dominio Microsoft falso","desc":"Microsoft envía desde microsoft.com. 'microsoft365-secure-team.com' es un dominio impostor."},
+    {"icon":"🗺️","title":"Geografía alarmante calculada","desc":"Usar 'Moscú, Rusia' maximiza el pánico. Los atacantes eligen ubicaciones que generan reacción inmediata."},
+    {"icon":"🎯","title":"Dos botones = trampa doble","desc":"Ambos botones ('Asegurar' y 'Fui Yo') llevan al mismo sitio de phishing."},
+    {"icon":"⏱️","title":"'Hace 5 minutos': presión extrema","desc":"La precisión temporal crea urgencia máxima. Es un dato inventado para impedir análisis."},
+  ],
+  "explanation":"Phishing de credenciales Microsoft. Con tu acceso M365 el atacante obtiene correo, OneDrive, Teams y todos los servicios.",
+  "legit_reason":None,"points":150,"time_limit":25,
+},
+{
+  "id":8,"level":2,"isPhishing":False,
+  "from_name":"Carlos Mendoza – Gerente General","from_email":"c.mendoza@miempresa.com",
+  "to":"empleado@miempresa.com","date":"Hoy, 09:45 AM",
+  "subject":"Reunión de equipo – Resultados Q2 y planificación Q3",
+  "body_html":'<div class="em-header" style="background:#4a148c">📅 Comunicación Interna – Gerencia General</div><div class="em-body"><p>Hola equipo,</p><p>Los convoco a la <strong>reunión mensual de resultados</strong> Q2 y planificación Q3 2024.</p><div class="em-info-box" style="border-color:#4a148c;background:#f3e5f5">📅 <strong>Fecha:</strong> Jueves 20 de junio, 10:00 AM – 12:00 PM<br>📍 <strong>Lugar:</strong> Sala de Conferencias A (piso 3) + Teams</div><p><strong>Agenda:</strong> KPIs Q2 · Análisis de brechas · Objetivos Q3 · Preguntas</p><p>Confirmen asistencia respondiendo este correo.<br><strong>Carlos Mendoza</strong> | Gerente General | Ext. 1001</p></div>',
+  "red_flags":[],"explanation":"Correo interno legítimo. Dominio corporativo oficial, agenda estructurada, contacto verificable.",
+  "legit_reason":"Dominio corporativo · Agenda concreta · Canales de respuesta múltiples · Sin datos sensibles",
+  "points":150,"time_limit":25,
+},
+# ── NIVEL 3: ATAQUES AVANZADOS ────────────────────────────
+{
+  "id":9,"level":3,"isPhishing":True,
+  "from_name":"Roberto Sánchez – CEO","from_email":"r.sanchez@miempresa-corp.net",
+  "to":"empleado@miempresa.com","date":"Hoy, 11:02 AM",
+  "subject":"CONFIDENCIAL: Transferencia urgente – Adquisición estratégica",
+  "body_html":'<div class="em-header" style="background:#b71c1c">CONFIDENCIAL – CEO Office</div><div class="em-body"><p>Hola,</p><p>Estoy en reunión con abogados y <strong>no puedo hablar por teléfono</strong>. Necesito que proceses una transferencia bancaria urgente hoy mismo.</p><p>Estamos cerrando una <strong>adquisición estratégica confidencial</strong>. Por instrucción del consejo, <u>no debe comunicarse internamente hasta su confirmación</u>.</p><div class="em-info-box" style="border-color:#b71c1c;background:#ffebee">Beneficiario: Inversiones Globales LLC | Banco: First National Bank<br>Cuenta: 4782-9901-0023 | Monto: <strong>$47,500 USD</strong></div><p>Procesa y confirma por este mismo correo. <strong>No lo menciones a nadie.</strong></p><p>Roberto Sánchez | CEO, MiEmpresa</p></div>',
+  "red_flags":[
+    {"icon":"📧","title":"Business Email Compromise (BEC)","desc":"Suplantar al CEO para transferencias es el ataque más costoso según el FBI IC3. +$26 mil millones anuales."},
+    {"icon":"🌐","title":"Dominio del CEO diferente al corporativo","desc":"'miempresa-corp.net' vs 'miempresa.com'. Un carácter de diferencia, consecuencias devastadoras."},
+    {"icon":"🤫","title":"Solicitud explícita de secreto","desc":"'No lo menciones a nadie' aísla a la víctima e impide que colegas identifiquen el fraude."},
+    {"icon":"📵","title":"Bloquea verificación telefónica","desc":"'No puedo hablar por teléfono' elimina el canal de verificación. Ante transferencias, SIEMPRE llama."},
+  ],
+  "explanation":"Business Email Compromise (BEC). El ataque más costoso del mundo. Verifica transferencias por teléfono directo sin importar quién ordena.",
+  "legit_reason":None,"points":200,"time_limit":20,
+},
+{
+  "id":10,"level":3,"isPhishing":False,
+  "from_name":"Comunicaciones – MiEmpresa","from_email":"comunicaciones@miempresa.com",
+  "to":"empleado@miempresa.com","date":"Hoy, 08:00 AM",
+  "subject":"📰 Boletín Interno MiEmpresa | Junio 2024",
+  "body_html":'<div class="em-header" style="background:#00695c">📰 Boletín Interno – Junio 2024</div><div class="em-body"><p><strong>🏆 Noticias del mes</strong></p><p><strong>Nuevo cliente:</strong> MiEmpresa firmó contrato con Corporación XYZ por 12 meses.</p><p><strong>Reconocimientos:</strong> El equipo de ventas superó la meta Q2 en un 18%.</p><hr style="border-color:#ddd;margin:12px 0"><p><strong>📅 Próximos eventos:</strong> 20 Jun: Reunión Q2 | 25 Jun: Día de integración | 30 Jun: Cierre contable</p><hr style="border-color:#ddd;margin:12px 0"><p><strong>💡 Tip de seguridad:</strong> El equipo de TI <u>nunca</u> solicitará su contraseña por correo. Reporte a seguridad@miempresa.com.</p><p class="em-footer">Para cancelar suscripción: Intranet → Comunicaciones</p></div>',
+  "red_flags":[],"explanation":"Boletín corporativo legítimo. Dominio oficial, sin solicitudes urgentes, desuscripción vía intranet.",
+  "legit_reason":"Dominio corporativo · Contenido informativo · Sin acciones urgentes · Desuscripción en intranet",
+  "points":200,"time_limit":20,
+},
+{
+  "id":11,"level":3,"isPhishing":True,
+  "from_name":"DocuSign","from_email":"firma@docusign-esignature.net",
+  "to":"empleado@miempresa.com","date":"Hoy, 10:15 AM",
+  "subject":"Documento pendiente: Actualización Contrato Laboral – Vence HOY",
+  "body_html":'<div class="em-header" style="background:#FFBE00;color:#333">✍️ DocuSign – Gestión de Documentos</div><div class="em-body"><p>Tiene un documento pendiente de firma de <strong>RRHH – MiEmpresa</strong>:</p><div class="em-info-box" style="border-color:#FFBE00;background:#fffde7">📄 <strong>Documento:</strong> Actualización de términos contractuales 2024<br>📤 <strong>Enviado por:</strong> María González (RRHH)<br>⏰ <strong>Vence:</strong> <span style="color:#cc0000"><strong>Hoy, 5:00 PM</strong></span></div><p><strong>Por favor firme antes de las 5:00 PM para no afectar su próximo pago de nómina.</strong></p><div class="em-cta-wrap"><a class="em-cta" href="#" style="background:#FFBE00;color:#333">✍️ FIRMAR DOCUMENTO AHORA</a></div><p class="em-footer">DocuSign, Inc. | docusign.com</p></div>',
+  "red_flags":[
+    {"icon":"🌐","title":"Dominio DocuSign falso","desc":"DocuSign opera desde docusign.com. 'docusign-esignature.net' es un dominio impostor."},
+    {"icon":"💰","title":"Amenaza directa a la nómina","desc":"Vincular la firma con el pago de salario es manipulación financiera. Los contratos no bloquean nóminas en horas."},
+    {"icon":"⏰","title":"Vencimiento el mismo día","desc":"Documentos contractuales con vencimiento de pocas horas son antinatural. Los legales dan 48-72h mínimo."},
+    {"icon":"🔍","title":"Verifica con RRHH directamente","desc":"Ante cualquier solicitud de firma laboral, confirma con RRHH por teléfono antes de proceder."},
+  ],
+  "explanation":"Phishing que abusa de plataformas de firma electrónica. La amenaza a la nómina explota una necesidad básica. Verifica con RRHH antes de firmar.",
+  "legit_reason":None,"points":200,"time_limit":20,
+},
+{
+  "id":12,"level":3,"isPhishing":False,
+  "from_name":"Gestión de Activos TI","from_email":"licencias@miempresa.com",
+  "to":"empleado@miempresa.com","date":"Ayer, 03:00 PM",
+  "subject":"Inventario de licencias software – Acción requerida (antes del viernes)",
+  "body_html":'<div class="em-header" style="background:#283593">🖥️ TI – Gestión de Activos y Licencias</div><div class="em-body"><p>Estimado equipo,</p><p>Iniciamos el proceso anual de <strong>renovación de licencias 2024–2025</strong>. Necesitamos su colaboración para completar el inventario.</p><div class="em-info-box" style="border-color:#283593;background:#e8eaf6"><strong>Acceso:</strong> Intranet → TI → Inventario de Software 2024<br><strong>Plazo:</strong> Viernes 21 de junio</div><p>El formulario solicita únicamente: nombre del software, versión y frecuencia de uso.</p><p><strong>Nota:</strong> No es necesario proporcionar contraseñas ni claves de licencia.</p><p>Equipo TI | licencias@miempresa.com | Ext. 2250</p></div>',
+  "red_flags":[],"explanation":"Correo legítimo de TI. Solo intranet, explica qué se necesita, NO solicita contraseñas, plazo razonable.",
+  "legit_reason":"Dominio corporativo · Solo intranet · Sin credenciales requeridas · Transparencia del proceso",
+  "points":200,"time_limit":20,
+},
+# ── NIVEL 4: SPEAR PHISHING ───────────────────────────────
+{
+  "id":13,"level":4,"isPhishing":True,
+  "from_name":"LinkedIn","from_email":"notifications@linkedin-messages.com",
+  "to":"empleado@miempresa.com","date":"Hoy, 12:30 PM",
+  "subject":"Ana García de TechCorp quiere conectar contigo en LinkedIn",
+  "body_html":'<div class="em-header" style="background:#0077b5">💼 LinkedIn</div><div class="em-body"><div class="em-info-box" style="border-color:#0077b5;background:#f3f6f8;display:flex;align-items:center;gap:15px"><div style="width:55px;height:55px;background:#0077b5;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:20px;flex-shrink:0">AG</div><div><strong>Ana García</strong><br>Directora de RRHH | TechCorp<br><span style="color:#0077b5">500+ conexiones en común</span></div></div><p><em>"Hola, vi tu perfil y creo que podríamos colaborar. Tenemos una posición de liderazgo que podría interesarte."</em></p><div class="em-cta-wrap"><a class="em-cta" href="#" style="background:#0077b5">Aceptar invitación</a></div><p class="em-footer">LinkedIn Corporation © 2024</p></div>',
+  "red_flags":[
+    {"icon":"🌐","title":"Dominio LinkedIn falso","desc":"LinkedIn usa linkedin.com. 'linkedin-messages.com' es dominio impostor."},
+    {"icon":"🎣","title":"Phishing de establecimiento de contacto","desc":"Una vez aceptas, el atacante enviará malware o solicitará información confidencial."},
+    {"icon":"💼","title":"Oferta laboral como cebo","desc":"El atacante investigó tus aspiraciones profesionales previo al ataque (OSINT). Es spear phishing."},
+    {"icon":"📧","title":"Accede directamente a linkedin.com","desc":"Siempre verifica solicitudes accediendo directamente al sitio. Nunca desde emails."},
+  ],
+  "explanation":"Spear phishing por LinkedIn. Primero establece confianza y luego usa esa conexión para enviar malware o robar información.",
+  "legit_reason":None,"points":250,"time_limit":18,
+},
+{
+  "id":14,"level":4,"isPhishing":False,
+  "from_name":"Ciberseguridad – MiEmpresa","from_email":"seguridad@miempresa.com",
+  "to":"empleado@miempresa.com","date":"Hoy, 09:00 AM",
+  "subject":"Actualización de seguridad: Windows Defender KB5034441 – Martes",
+  "body_html":'<div class="em-header" style="background:#e65100">🛡️ Equipo de Ciberseguridad – MiEmpresa</div><div class="em-body"><p>Estimado colaborador,</p><p>El <strong>martes 18 de junio</strong>, el sistema WSUS desplegará automáticamente la actualización de seguridad <strong>KB5034441</strong> en todos los equipos.</p><div class="em-info-box" style="border-color:#e65100;background:#fff3e0">✅ <strong>No es necesaria ninguna acción de su parte.</strong><br>La actualización ocurrirá automáticamente durante el reinicio.</div><p>Si experimenta problemas: helpdesk.miempresa.com o Ext. 2200.</p><p>Esta comunicación fue aprobada por el CISO. Verifique en el portal de seguridad (intranet).</p></div>',
+  "red_flags":[],"explanation":"Comunicación legítima. Dominio corporativo, sin acción requerida, técnicamente específica (WSUS, KB real), verificable en intranet.",
+  "legit_reason":"Dominio corporativo · Sin acción requerida · Técnicamente específico · Verificable en intranet",
+  "points":250,"time_limit":18,
+},
+{
+  "id":15,"level":4,"isPhishing":True,
+  "from_name":"Servicio de Impuestos Internos","from_email":"notificaciones@sii-tributario.org",
+  "to":"empleado@miempresa.com","date":"Hoy, 08:45 AM",
+  "subject":"NOTIFICACIÓN OFICIAL: Reembolso de $2,340 pendiente de reclamación",
+  "body_html":'<div class="em-header" style="background:#1a237e">🏛️ SERVICIO DE IMPUESTOS INTERNOS – Notificación Oficial</div><div class="em-body"><p>Estimado contribuyente,</p><p>Tras revisar su declaración fiscal, tiene derecho a un <strong>reembolso de $2,340.00</strong> del período fiscal 2023.</p><div class="em-info-box" style="border-color:#1a237e;background:#e8eaf6">Referencia: <strong>REF-2024-TX-88291</strong> | Monto: <strong>$2,340.00 USD</strong><br>Estado: ✅ Aprobado – Pendiente de reclamación | Vencimiento: 30 días</div><p>Para recibir su reembolso, verifique su identidad y proporcione sus <strong>datos bancarios</strong>:</p><div class="em-cta-wrap"><a class="em-cta" href="#" style="background:#1a237e">Reclamar mi Reembolso →</a></div></div>',
+  "red_flags":[
+    {"icon":"🌐","title":"Dominio gubernamental falso","desc":"Los servicios fiscales usan dominios .gov. 'sii-tributario.org' no es un dominio gubernamental legítimo."},
+    {"icon":"💰","title":"Reembolso inesperado como cebo","desc":"La promesa de dinero explota el pensamiento desiderativo. Si no esperabas un reembolso, sospecha."},
+    {"icon":"🏦","title":"Datos bancarios por email","desc":"Los organismos fiscales NUNCA piden datos bancarios por email. Los reembolsos usan información ya registrada."},
+    {"icon":"⏰","title":"Vencimiento artificial de 30 días","desc":"Urgencia fabricada para actuar antes de consultar con alguien."},
+  ],
+  "explanation":"Phishing tributario. Combina promesa de dinero con autoridad gubernamental. Objetivo: robar datos bancarios o credenciales fiscales.",
+  "legit_reason":None,"points":250,"time_limit":18,
+},
+{
+  "id":16,"level":4,"isPhishing":False,
+  "from_name":"Amazon Web Services","from_email":"billing@aws.amazon.com",
+  "to":"empleado@miempresa.com","date":"01 Jun 2024, 12:00 AM",
+  "subject":"Your AWS bill for May 2024 is ready",
+  "body_html":'<div class="em-header" style="background:#232f3e">☁️ Amazon Web Services – Billing</div><div class="em-body"><p>Dear AWS Customer,</p><p>Your AWS invoice for May 2024 is now available.</p><div class="em-info-box" style="background:#f5f5f5;border-color:#232f3e"><strong>Account ID:</strong> 123456789012<br><strong>Billing Period:</strong> May 1 – May 31, 2024<br><strong>Total Charges:</strong> $1,847.23 USD | Payment: Visa ****4521</div><p>To view your invoice, sign in to the <strong>AWS Management Console</strong> at <em>console.aws.amazon.com</em> → Billing.</p><p>Amazon Web Services | billing@aws.amazon.com</p></div>',
+  "red_flags":[],"explanation":"Factura legítima de AWS. Dominio oficial aws.amazon.com, datos parciales verificables, acceso directo a consola sin enlace embebido.",
+  "legit_reason":"Dominio AWS oficial · Datos parciales verificables · Sin enlace directo embebido · Instrucciones de acceso directo",
+  "points":250,"time_limit":18,
+},
+# ── NIVEL 5: APT / ÉLITE ─────────────────────────────────
+{
+  "id":17,"level":5,"isPhishing":True,
+  "from_name":"GitHub Security","from_email":"noreply@github-security.io",
+  "to":"empleado@miempresa.com","date":"Hoy, 09:23 AM",
+  "subject":"Critical vulnerability in miempresa/core-api – CVE-2024-3094 (CVSS 10.0)",
+  "body_html":'<div class="em-header" style="background:#24292e">🐙 GitHub Security Alert</div><div class="em-body"><p>GitHub detected a <strong>critical vulnerability (CVE-2024-3094)</strong> in <strong>miempresa/core-api</strong>.</p><div class="em-info-box" style="border-color:#ffc107;background:#fff3cd">🔴 <strong>CRITICAL – CVSS Score: 10.0</strong><br>Package: xz-utils (5.6.0 / 5.6.1) | Impact: Remote Code Execution<br>Repository: <strong>miempresa/core-api</strong> (branch: main)</div><p>A malicious actor could exploit this to gain <strong>unauthorized access to your systems</strong>.</p><div class="em-cta-wrap"><a class="em-cta" href="#" style="background:#24292e">View Security Advisory &amp; Patch</a></div><p class="em-footer">GitHub, Inc. | github.com/security</p></div>',
+  "red_flags":[
+    {"icon":"🌐","title":"Dominio GitHub falso","desc":"GitHub usa github.com. 'github-security.io' es dominio falso para atacar perfiles técnicos."},
+    {"icon":"🔬","title":"CVE real usado como cebo","desc":"CVE-2024-3094 es una vulnerabilidad real (backdoor XZ Utils). Los atacantes usan CVEs reales para dar credibilidad."},
+    {"icon":"🎯","title":"Nombre de repositorio obtenido por OSINT","desc":"'miempresa/core-api' fue encontrado en GitHub público. Es spear phishing preparado."},
+    {"icon":"⚡","title":"CVSS 10.0 genera urgencia técnica extrema","desc":"Los desarrolladores actúan rápido ante críticas. Este sesgo profesional es lo que el atacante explota."},
+  ],
+  "explanation":"Spear phishing técnico APT. El atacante conoce el repositorio, usa un CVE real y explota el instinto de respuesta inmediata de perfiles técnicos.",
+  "legit_reason":None,"points":300,"time_limit":15,
+},
+{
+  "id":18,"level":5,"isPhishing":False,
+  "from_name":"Dropbox Business","from_email":"no-reply@dropbox.com",
+  "to":"empleado@miempresa.com","date":"Hoy, 11:00 AM",
+  "subject":"Laura Martínez shared 'Propuesta Q3 2024.pdf' with you",
+  "body_html":'<div class="em-header" style="background:#0061FF">📁 Dropbox Business</div><div class="em-body"><p><strong>Laura Martínez (l.martinez@miempresa.com)</strong> ha compartido un archivo contigo.</p><div class="em-info-box" style="border-color:#0061FF;background:#f0f4ff;display:flex;align-items:center;gap:15px"><span style="font-size:36px">📄</span><div><strong>Propuesta Q3 2024.pdf</strong><br>Compartido por: l.martinez@miempresa.com | Tamaño: 2.4 MB | Modificado: Hoy</div></div><div class="em-cta-wrap"><a class="em-cta" href="#" style="background:#0061FF">Abrir en Dropbox</a></div><p class="em-footer">Recibiste este email porque l.martinez@miempresa.com compartió desde Dropbox Business.</p></div>',
+  "red_flags":[],"explanation":"Compartir legítimo de Dropbox. Dominio oficial, remitente del dominio corporativo, nombre de archivo específico y contextualmente relevante.",
+  "legit_reason":"Dominio Dropbox oficial · Remitente del dominio corporativo · Nombre de archivo específico · Contexto relevante",
+  "points":300,"time_limit":15,
+},
+{
+  "id":19,"level":5,"isPhishing":True,
+  "from_name":"Zoom","from_email":"no-reply@zoom-webinar-invite.com",
+  "to":"empleado@miempresa.com","date":"Hoy, 08:00 AM",
+  "subject":"Capacitación OBLIGATORIA – Cumplimiento y Ética Empresarial – HOY 3 PM",
+  "body_html":'<div class="em-header" style="background:#2D8CFF">📹 Zoom Webinar – Convocatoria Oficial</div><div class="em-body"><p>Ha sido convocado a una <strong>capacitación obligatoria</strong> de cumplimiento normativo.</p><div class="em-info-box" style="border-color:#2D8CFF;background:#eff6ff">📋 <strong>Capacitación:</strong> Cumplimiento y Ética Empresarial 2024<br>📅 <strong>Fecha:</strong> <span style="color:#cc0000"><strong>Hoy, 3:00 PM – 5:00 PM</strong></span><br>⚠️ <strong>Asistencia:</strong> OBLIGATORIA – Afecta evaluación de desempeño</div><p>Para unirse, complete el registro. El sistema <strong>solicitará sus credenciales corporativas</strong> para verificar que es empleado autorizado.</p><div class="em-cta-wrap"><a class="em-cta" href="#" style="background:#2D8CFF">Unirse a Zoom – Registro requerido</a></div></div>',
+  "red_flags":[
+    {"icon":"🌐","title":"Dominio Zoom falso","desc":"Zoom usa zoom.us. 'zoom-webinar-invite.com' es dominio falso."},
+    {"icon":"🔑","title":"Zoom no pide credenciales corporativas","desc":"Zoom nunca solicita las credenciales de tu empresa para unirte a una reunión."},
+    {"icon":"⚖️","title":"Coerción laboral (evaluación de desempeño)","desc":"Vincular asistencia con evaluación elimina el pensamiento crítico. Táctica avanzada."},
+    {"icon":"📅","title":"Capacitación obligatoria comunicada el mismo día","desc":"Una capacitación de compliance comunicada y celebrada el mismo día es operativamente imposible."},
+  ],
+  "explanation":"Phishing de Zoom que combina autoridad + coerción laboral + urgencia. Las 'credenciales corporativas para verificar identidad' son el robo directo.",
+  "legit_reason":None,"points":300,"time_limit":15,
+},
+{
+  "id":20,"level":5,"isPhishing":False,
+  "from_name":"Red Team – Ciberseguridad","from_email":"redteam@miempresa.com",
+  "to":"empleado@miempresa.com","date":"Hoy, 10:00 AM",
+  "subject":"Resultado de su prueba de phishing simulado – Informe personal disponible",
+  "body_html":'<div class="em-header" style="background:#1b5e20">✅ Red Team – Ciberseguridad MiEmpresa</div><div class="em-body"><p>Estimado colaborador,</p><p>Como parte del <strong>programa anual de seguridad</strong>, nuestro equipo realizó un <strong>ejercicio controlado de phishing simulado</strong> autorizado por la Dirección General.</p><p>Sus resultados individuales están disponibles en la intranet:</p><div class="em-info-box" style="border-color:#1b5e20;background:#e8f5e9"><strong>Ruta:</strong> Intranet → Seguridad → Resultados Ejercicio Phishing 2024</div><p>Red Team – Ciberseguridad | redteam@miempresa.com | Ext. 2400<br><em>Ejercicio autorizado por: Roberto Sánchez, CEO | María López, CISO</em></p></div>',
+  "red_flags":[],"explanation":"Comunicación legítima del Red Team. Dominio corporativo, acceso solo en intranet, cadena de autorización explícita, sin solicitud de datos.",
+  "legit_reason":"Dominio corporativo · Solo intranet · Autorización explícita verificable (CEO+CISO) · Sin solicitud de datos",
+  "points":300,"time_limit":15,
+},
+# ── NIVEL 6: AMENAZAS EMERGENTES ─────────────────────────
+{
+  "id":21,"level":6,"type":"email","isPhishing":True,"categoria":"BEC",
+  "from_name":"Dr. Fernando Vásquez — CFO","from_email":"cfo@miempresa-finance.com",
+  "to":"empleado@miempresa.com","date":"Hoy, 14:32 PM",
+  "subject":"CONFIDENCIAL: Wire transfer para cierre de adquisición — HOY 3pm",
+  "body_html":'<div class="em-header" style="background:#1a237e">🏦 Oficina del CFO — Comunicación Confidencial</div><div class="em-body"><p>Hola equipo de pagos,</p><p>Necesito que procesen este wire antes del cierre bancario (3:00 PM). Es para una adquisición estratégica que se cierra hoy. El equipo legal ya está al tanto, pero <strong>por instrucción del abogado externo no puede pasar por los canales normales de aprobación esta vez.</strong></p><div class="em-info-box" style="border-color:#b71c1c;background:#ffebee">Beneficiario: <strong>Meridian Holdings LLC</strong><br>Monto: <strong>$142,800 USD</strong> | Routing: 021000021 | Cta: 7741982301</div><p><strong>No comenten esto con otros colegas hasta que se confirme la operación.</strong> El CEO informará al equipo después de las 5pm.</p><p>— Dr. Fernando Vásquez, CFO</p></div>',
+  "red_flags":[
+    {"icon":"🌐","title":"Dominio lateral del CFO","desc":"'miempresa-finance.com' vs 'miempresa.com'. El atacante registró un dominio casi idéntico al corporativo."},
+    {"icon":"🚫","title":"'No puede pasar por los canales normales'","desc":"Los canales de aprobación existen exactamente para detectar fraudes. Eliminarlos es la táctica central del atacante."},
+    {"icon":"🤫","title":"'No comenten' — aislamiento estratégico","desc":"Impide que compañeros identifiquen el fraude. Las adquisiciones reales no requieren silencio del equipo de pagos."},
+    {"icon":"⏰","title":"Cierre bancario como presión artificial","desc":"El plazo de las 3:00 PM impide verificación. Regla absoluta: llama al CFO al número que ya conoces."},
+  ],
+  "explanation":"BEC sofisticado que imita al CFO desde dominio casi idéntico. La instrucción de 'saltarse los canales normales' es la señal definitiva de fraude. Verifica SIEMPRE por teléfono.",
+  "legit_reason":None,"points":350,"time_limit":15,
+  "meta_q":"¿Por qué 'no puede pasar por los canales normales de aprobación' es la señal más definitiva de fraude BEC?",
+  "meta_ops":[
+    "Los canales de aprobación existen exactamente para detectar fraudes — eliminarlos intencionalmente revela el engaño",
+    "Porque el monto de $142,800 es inusualmente alto para una transferencia corporativa",
+    "Porque el plazo de cierre bancario es a las 3:00 PM de hoy mismo",
+    "Porque el CFO usa título 'Dr.' que no es habitual en comunicaciones internas"
+  ],
+  "meta_ok":0,
+},
+{
+  "id":22,"level":6,"type":"email","isPhishing":True,"categoria":"BEC",
+  "from_name":"Compensaciones — RRHH","from_email":"compensaciones@rrhh-grupo.net",
+  "to":"empleado@miempresa.com","date":"Hoy, 09:15 AM",
+  "subject":"Urgente: Actualización de datos bancarios — Ajuste de nómina aprobado",
+  "body_html":'<div class="em-header" style="background:#2e7d32">💰 Recursos Humanos — Comité de Compensaciones</div><div class="em-body"><p>Estimada colaboradora,</p><p>El Comité Ejecutivo aprobó un ajuste especial en tu nómina para este mes. Para procesar el depósito adicional, necesitamos que actualices tu información bancaria en el formulario seguro:</p><div class="em-cta-wrap"><a class="em-cta" href="#" style="background:#2e7d32">ACTUALIZAR DATOS BANCARIOS →</a></div><p class="em-footer">https://rrhh-datos-seguros.net/formulario</p><p><strong>IMPORTANTE:</strong> Completa el proceso antes de las 6:00 PM de hoy para que el ajuste se refleje en el pago de este mes.</p></div>',
+  "red_flags":[
+    {"icon":"🌐","title":"Dominio externo no corporativo","desc":"rrhh-grupo.net y el link rrhh-datos-seguros.net no son el dominio corporativo miempresa.com."},
+    {"icon":"🏦","title":"RRHH nunca pide datos bancarios por formulario web externo","desc":"El proceso correcto es en el portal corporativo o presencialmente. Un formulario externo capturará tus datos sin control."},
+    {"icon":"💰","title":"'Ajuste especial' — cebo de codicia","desc":"La promesa de dinero extra activa un sesgo emocional que inhibe el pensamiento crítico."},
+    {"icon":"⏰","title":"Plazo de hoy para prevenir verificación","desc":"El plazo de 6:00 PM impide verificar con RRHH en persona o por teléfono."},
+  ],
+  "explanation":"BEC orientado a robo de datos bancarios del empleado. RRHH nunca solicita actualización por formulario externo. El atacante redirigirá futuras nóminas.",
+  "legit_reason":None,"points":350,"time_limit":15,
+  "meta_q":"¿Por qué RRHH nunca solicita actualización de datos bancarios por formulario web externo?",
+  "meta_ops":[
+    "El portal corporativo interno es el único canal seguro y auditable — un formulario externo capturará tus datos sin ningún control",
+    "Porque los formularios web externos son más lentos que los portales internos",
+    "Porque los datos bancarios son demasiado sensibles para cualquier tipo de formulario",
+    "Porque RRHH siempre prefiere realizar este proceso en persona sin ninguna excepción"
+  ],
+  "meta_ok":0,
+},
+{
+  "id":23,"level":6,"type":"qr","isPhishing":True,"categoria":"quishing",
+  "from_name":"Control de Acceso — Seguridad","from_email":"acceso@seguridad-corp.net",
+  "to":"empleado@miempresa.com","date":"Hoy, 08:00 AM",
+  "subject":"OBLIGATORIO: Renovación de badge de acceso — Escanea el QR antes del viernes",
+  "body_html":'<div class="em-header" style="background:#212121">🔐 Departamento de Seguridad Física — Control de Acceso</div><div class="em-body"><p>Estimado empleado,</p><p>Nuestro sistema de control de acceso migró a la nueva plataforma de autenticación. <strong>Todos los empleados deben renovar su badge digital antes del viernes.</strong></p><p>Escanea el código QR con tu teléfono para completar el proceso:</p><div class="qr-placeholder" data-url="https://badge-renewal-corp.net/auth"></div><p class="em-footer">URL destino: badge-renewal-corp.net/auth — Empleados que no completen el proceso perderán acceso el lunes.</p></div>',
+  "red_flags":[
+    {"icon":"📱","title":"QR apunta a dominio externo","desc":"badge-renewal-corp.net no es el dominio corporativo miempresa.com. Los QR ocultan la URL — el atacante lo sabe."},
+    {"icon":"🏢","title":"Badge renewal nunca se hace por QR en email","desc":"Las renovaciones de badge se hacen presencialmente en Recepción o Seguridad, nunca por link externo."},
+    {"icon":"🌐","title":"Remitente en dominio no corporativo","desc":"seguridad-corp.net no es el dominio real de la empresa. Seguridad interna usa @miempresa.com."},
+    {"icon":"😨","title":"Amenaza de perder acceso físico","desc":"Perder acceso a instalaciones crea pánico inmediato. Táctica de presión para saltarse la verificación."},
+  ],
+  "explanation":"Quishing (QR phishing): los QR son peligrosos porque la URL destino no es visible antes de escanear. Siempre verifica el remitente y confirma con Seguridad antes de escanear.",
+  "legit_reason":None,"points":350,"time_limit":15,
+  "meta_q":"¿Por qué los códigos QR son especialmente efectivos como vector de phishing?",
+  "meta_ops":[
+    "La URL destino no es visible antes de escanear — el usuario no puede verificarla como lo haría con un enlace de texto",
+    "Porque los QR son difíciles de distinguir entre sí visualmente en un email",
+    "Porque los teléfonos móviles tienen menos protecciones de seguridad que las computadoras",
+    "Porque los QR corporativos siempre parecen más oficiales y confiables que los enlaces"
+  ],
+  "meta_ok":0,
+},
+{
+  "id":24,"level":6,"type":"sms","isPhishing":True,"categoria":"smishing",
+  "from_name":"Número desconocido","from_email":"+1 (855) 247-9031",
+  "to":"Tu teléfono","date":"Hoy, 10:14 AM",
+  "subject":"SMS de Alerta TI",
+  "body_html":"ALERTA IT CORP: Tu cuenta O365 fue comprometida. Verifica AHORA: http://it-secure-verify.net/o365 — perderás acceso en 2h. No respondas. Ref: INC-20249",
+  "red_flags":[
+    {"icon":"📱","title":"Número de teléfono externo desconocido","desc":"El helpdesk interno tiene un número registrado. Un número +1 (855) externo nunca envía alertas corporativas reales."},
+    {"icon":"🌐","title":"URL en dominio externo","desc":"it-secure-verify.net no es el dominio corporativo. TI real usa portales internos conocidos para reseteos."},
+    {"icon":"⏰","title":"2 horas: urgencia extrema por SMS","desc":"Los ataques por SMS explotan la inmediatez del canal. TI real usa el sistema de tickets con tiempo razonable."},
+    {"icon":"✍️","title":"Sin tildes y errores gramaticales","desc":"'perderás' vs errores de puntuación son señales de mensaje automatizado malicioso."},
+  ],
+  "explanation":"Smishing (SMS phishing). TI real nunca usa números externos para alertas corporativas. El link captura credenciales de O365 — correo, Teams, OneDrive.",
+  "legit_reason":None,"points":350,"time_limit":15,
+  "meta_q":"¿Cuál es la señal más definitiva de que este SMS de alerta O365 es smishing y no una alerta real del equipo de TI?",
+  "meta_ops":[
+    "El número es externo (+1 855) y la URL apunta a un dominio ajeno al corporativo — TI real usa canales conocidos",
+    "Porque el SMS no tiene el logo ni los colores de la empresa en el mensaje",
+    "Porque los SMS de alertas de TI siempre deben incluir el nombre del técnico responsable",
+    "Porque el link usa HTTP en lugar de HTTPS lo que lo hace inseguro automáticamente"
+  ],
+  "meta_ok":0,
+},
+{
+  "id":25,"level":6,"type":"qr","isPhishing":False,
+  "from_name":"Laura Ríos — Coordinadora de Eventos","from_email":"eventos@miempresa.com",
+  "to":"empleado@miempresa.com","date":"Hoy, 11:00 AM",
+  "subject":"Código QR de acceso — Evento corporativo jueves 15 de mayo",
+  "body_html":'<div class="em-header" style="background:#00695c">🎉 Coordinación de Eventos — MiEmpresa</div><div class="em-body"><p>Hola equipo,</p><p>Adjunto el código QR de acceso para el evento corporativo del próximo jueves. Escanea para confirmar tu asistencia y obtener acceso al salón:</p><div class="qr-placeholder" data-url="https://eventos.miempresa.com/confirm/EVT-2025-05"></div><p class="em-footer">URL destino: eventos.miempresa.com/confirm/EVT-2025-05</p><p>Cualquier duda, contáctame directamente.<br><strong>Laura Ríos</strong> — Coordinadora de Eventos | eventos@miempresa.com | Ext. 3201</p></div>',
+  "red_flags":[],"explanation":"QR corporativo legítimo. El remitente es del dominio corporativo real (@miempresa.com) y la URL del QR apunta al subdominio corporativo conocido (eventos.miempresa.com).",
+  "legit_reason":"Remitente @miempresa.com · URL del QR en subdominio corporativo · Persona verificable con extensión · Sin urgencia ni amenazas",
+  "points":350,"time_limit":15,
+},
+{
+  "id":26,"level":6,"type":"sms","isPhishing":False,
+  "from_name":"Marriott Rewards","from_email":"+506 2234-5678",
+  "to":"Tu teléfono","date":"Hoy, 09:03 AM",
+  "subject":"SMS de confirmación de reserva",
+  "body_html":"Reserva confirmada. Hotel Marriott Reforma, check-in 18 mayo. Código: MXC-4491. Para asistencia llama al +52 55 9138-4888. Marriott Rewards.",
+  "red_flags":[],"explanation":"SMS legítimo de confirmación de reserva. No contiene ningún enlace, no solicita acción, incluye información verificable y número de contacto opcional.",
+  "legit_reason":"Sin enlace ni URL · Solo información verificable · Número de contacto opcional · Sin urgencia ni solicitud de datos",
+  "points":350,"time_limit":15,
+},
+]
+
+LEVELS = {
+    "1":{"name":"Amenazas Básicas",    "color":"#00ff88"},
+    "2":{"name":"Nivel Intermedio",    "color":"#4a9eff"},
+    "3":{"name":"Ataques Avanzados",   "color":"#ff9f0a"},
+    "4":{"name":"Spear Phishing",      "color":"#bf5af2"},
+    "5":{"name":"APT / Élite",         "color":"#ff2d55"},
+    "6":{"name":"Amenazas Emergentes", "color":"#00e5ff"},
+}
+
+BADGES = [
+    {"id":"first",  "ic":"🎮","nm":"Primera Misión",   "ds":"Completar el primer correo"},
+    {"id":"lvl1",   "ic":"🎣","nm":"Cazador de Phish", "ds":"Superar el Nivel 1"},
+    {"id":"lvl3",   "ic":"🔍","nm":"Detective Digital", "ds":"Superar el Nivel 3"},
+    {"id":"lvl5",   "ic":"🏆","nm":"Agente PhishGuard", "ds":"Completar los 6 niveles"},
+    {"id":"combo5", "ic":"🦅","nm":"Ojo de Águila",     "ds":"5 aciertos consecutivos"},
+    {"id":"speed",  "ic":"⚡","nm":"Velocidad Máxima",  "ds":"Responder en menos de 5 segundos"},
+    {"id":"shield", "ic":"🛡️","nm":"Escudo de Acero",  "ds":"Nivel completo sin perder vidas"},
+    {"id":"elite",  "ic":"💎","nm":"Gran Maestro",       "ds":"Puntuación final mayor a 5,000 pts"},
+]
+
+RANKS = [
+    {"min":0,    "label":"Aprendiz",        "color":"#5a7aaa","bg":"rgba(90,122,170,.15)"},
+    {"min":1000, "label":"Analista",        "color":"#00e5ff","bg":"rgba(0,229,255,.12)"},
+    {"min":3000, "label":"Investigador",    "color":"#00ff88","bg":"rgba(0,255,136,.12)"},
+    {"min":6000, "label":"Especialista",    "color":"#ff9f0a","bg":"rgba(255,159,10,.12)"},
+    {"min":10000,"label":"Experto",         "color":"#bf5af2","bg":"rgba(191,90,242,.12)"},
+    {"min":14000,"label":"Agente de Élite", "color":"#ffd60a","bg":"rgba(255,214,10,.15)"},
+]
+
+MISSIONS_POOL = [
+    {"id":1,"emoji":"🎯","titulo":"Sin errores Nivel 1","desc":"Completa el Nivel 1 sin cometer ningún error","tipo":"nivel_perfecto","nivel":1,"meta":1,"xp":100},
+    {"id":2,"emoji":"🔥","titulo":"Racha de fuego","desc":"Consigue 5 respuestas correctas consecutivas","tipo":"racha","meta":5,"xp":150},
+    {"id":3,"emoji":"⚡","titulo":"Velocista","desc":"Responde 3 correos en menos de 8 segundos","tipo":"velocidad","meta":3,"xp":120},
+    {"id":4,"emoji":"🕵️","titulo":"Detector BEC","desc":"Identifica correctamente 2 ataques BEC","tipo":"categoria","cat":"BEC","meta":2,"xp":200},
+    {"id":5,"emoji":"🧠","titulo":"Mente analítica","desc":"Acierta 3 preguntas de metacognición seguidas","tipo":"meta_racha","meta":3,"xp":180},
+    {"id":6,"emoji":"❤️","titulo":"Intocable","desc":"Completa cualquier nivel sin perder ninguna vida","tipo":"nivel_sin_vida","meta":1,"xp":160},
+    {"id":7,"emoji":"📱","titulo":"Maestro QR","desc":"Detecta correctamente los 2 ataques de quishing","tipo":"categoria","cat":"quishing","meta":2,"xp":220},
+    {"id":8,"emoji":"🏆","titulo":"Puntaje élite","desc":"Acumula más de 8,000 puntos en una partida","tipo":"puntaje","meta":8000,"xp":250},
+    {"id":9,"emoji":"💬","titulo":"SMS sin trampa","desc":"Detecta los 2 ataques smishing correctamente","tipo":"categoria","cat":"smishing","meta":2,"xp":200},
+]
+
+# ══════════════════════════════════════════════════════════
+#  CSS, HTML Y MOTOR DE JUEGO
+# ══════════════════════════════════════════════════════════
+CSS = '''
 :root{--bg0:#05080f;--bg1:#0b1222;--bg2:#111a30;--bg3:#18243e;
   --cyan:#00e5ff;--green:#00ff88;--red:#ff2d55;--orange:#ff9f0a;
   --yellow:#ffd60a;--purple:#bf5af2;--blue:#4a9eff;
@@ -253,11 +673,9 @@ body::after{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
 .combo-anim{animation:comboPop .3s ease}
 ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:var(--bg1)}
 ::-webkit-scrollbar-thumb{background:var(--bg3);border-radius:4px}
+'''
 
-</style>
-</head>
-<body>
-
+HTML_BODY = '''
 <canvas id="stars-bg"></canvas>
 <div id="toasts"></div>
 
@@ -429,15 +847,9 @@ body::after{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
     <button class="btn btn-outline btn-md" onclick="G.intro()">🏠 INICIO</button>
   </div>
 </div>
+'''
 
-<script>
-const EMAILS_RAW=[{"id":1,"level":1,"isPhishing":true,"from_name":"Soporte Banco Nacional","from_email":"soporte@banconacional-seguridad.xyz","to":"empleado@miempresa.com","date":"Hoy, 09:14 AM","subject":"⚠️ URGENTE: Su cuenta ha sido SUSPENDIDA – Actúe AHORA","body_html":"<div class=\"em-header\" style=\"background:#003087\">🏦 BANCO NACIONAL – Seguridad</div><div class=\"em-body\"><p>Estimado cliente,</p><p><strong style=\"color:#cc0000\">⚠️ SU CUENTA HA SIDO SUSPENDIDA TEMPORALMENTE</strong></p><p>Hemos detectado actividad <strong>SOSPECHOSA</strong>. Debe verificar en las próximas <strong style=\"color:#cc0000\">2 HORAS</strong> o su cuenta será <u>cerrada permanentemente</u>.</p><div class=\"em-cta-wrap\"><a class=\"em-cta\" href=\"#\" style=\"background:#003087\">🔓 VERIFICAR MI CUENTA AHORA</a></div><p>Necesitará: número de cuenta, contraseña, tarjeta y CVV.</p><p class=\"em-footer\">Si no actúa, su cuenta será eliminada. Este es su único aviso.</p></div>","red_flags":[{"icon":"🌐","title":"Dominio falso (.xyz)","desc":"Los bancos nunca usan extensiones .xyz. El dominio real es verificable en la web oficial."},{"icon":"⏰","title":"Urgencia artificial","desc":"'2 HORAS' es manipulación psicológica. Los bancos reales notifican con días de antelación."},{"icon":"🔑","title":"Solicitud de datos críticos","desc":"Ningún banco legítimo pide contraseña y CVV por correo. Siempre es trampa."},{"icon":"📢","title":"MAYÚSCULAS y amenazas","desc":"Uso de mayúsculas, exclamaciones y amenazas de cierre son ingeniería social clásica."}],"explanation":"Phishing bancario clásico. Dominio falso + urgencia + datos sensibles. Los bancos reales NUNCA piden CVV por email.","legit_reason":null,"points":100,"time_limit":30},{"id":2,"level":1,"isPhishing":false,"from_name":"IT Support – MiEmpresa","from_email":"soporte.ti@miempresa.com","to":"empleado@miempresa.com","date":"Hoy, 10:30 AM","subject":"Mantenimiento programado de sistemas – Sábado 02:00–04:00 AM","body_html":"<div class=\"em-header\" style=\"background:#1a237e\">💻 Departamento de TI – MiEmpresa</div><div class=\"em-body\"><p>Estimado equipo,</p><p>El próximo <strong>sábado 15 de junio</strong> realizaremos mantenimiento preventivo.</p><p><strong>Horario:</strong> 02:00 AM – 04:00 AM</p><ul><li>Correo electrónico corporativo</li><li>VPN corporativa</li><li>Intranet y recursos compartidos</li></ul><p>No es necesario realizar ninguna acción. Para consultas: <strong>ext. 2200</strong>.</p><p><strong>Equipo de TI</strong> | soporte.ti@miempresa.com</p></div>","red_flags":[],"explanation":"Correo legítimo de TI. Dominio corporativo oficial, sin datos sensibles, canales verificables.","legit_reason":"Dominio corporativo oficial · Sin solicitud de credenciales · Canales internos verificables","points":100,"time_limit":30},{"id":3,"level":1,"isPhishing":true,"from_name":"Amazon","from_email":"noreply@amazon-confirmaciones-pedidos.net","to":"empleado@miempresa.com","date":"Ayer, 11:45 PM","subject":"Pedido #AMZ-8847291 – Confirme su dirección URGENTE","body_html":"<div class=\"em-header\" style=\"background:#ff9900;color:#232f3e\">📦 amazon – Confirmación de Pedido</div><div class=\"em-body\"><p>Hemos procesado su pedido pero necesitamos confirmar su dirección de entrega.</p><div class=\"em-info-box\" style=\"border-color:#ff9900;background:#fff8ee\"><strong>Pedido #AMZ-8847291</strong><br>iPhone 15 Pro Max 256GB | Total: $1,299.99 USD<br>Estado: <span style=\"color:#e67e00\">⚠️ Pendiente de confirmación</span></div><p><strong>Si no confirma en 24 horas, el pedido será cancelado y se realizará el cargo de todas formas.</strong></p><div class=\"em-cta-wrap\"><a class=\"em-cta\" href=\"#\" style=\"background:#ff9900;color:#232f3e\">Confirmar Dirección y Datos de Pago</a></div><p class=\"em-footer\">Amazon.com © 2024</p></div>","red_flags":[{"icon":"🌐","title":"Dominio impostor","desc":"Amazon usa amazon.com. 'amazon-confirmaciones-pedidos.net' es un dominio de atacantes."},{"icon":"🛒","title":"Pedido no solicitado","desc":"El atacante espera que hagas clic para 'cancelarlo'. Ambas opciones capturan credenciales."},{"icon":"💳","title":"Solicitud de datos de pago","desc":"Amazon nunca pide datos de pago por email para pedidos ya procesados."},{"icon":"⚠️","title":"Contradicción lógica","desc":"'Cancelado pero con cargo de todas formas' es amenaza ilógica diseñada para generar pánico."}],"explanation":"Phishing de Amazon con pedido falso de alto valor. Objetivo: robar credenciales mientras intentas 'cancelar' el cargo.","legit_reason":null,"points":100,"time_limit":30},{"id":4,"level":1,"isPhishing":false,"from_name":"María González – RRHH","from_email":"m.gonzalez@miempresa.com","to":"empleado@miempresa.com","date":"Hoy, 08:15 AM","subject":"Recordatorio: Encuesta de Clima Laboral 2024 – Vence el viernes","body_html":"<div class=\"em-header\" style=\"background:#2e7d32\">👥 Recursos Humanos – MiEmpresa</div><div class=\"em-body\"><p>Estimado colaborador,</p><p>Le recordamos que la <strong>Encuesta Anual de Clima Laboral 2024</strong> cierra el próximo <strong>viernes 19 de junio</strong>.</p><p>La encuesta es completamente <strong>anónima</strong> y toma aproximadamente 10 minutos.</p><div class=\"em-info-box\" style=\"border-color:#2e7d32;background:#f1f8e9\"><strong>Acceso:</strong> Intranet → Recursos Humanos → Encuesta Clima 2024</div><p>El <strong>67% del equipo</strong> ya ha participado.<br><strong>María González</strong> – Analista RRHH | Ext. 1045</p></div>","red_flags":[],"explanation":"Correo legítimo de RRHH. Dominio corporativo, sin credenciales, acceso vía intranet, contacto verificable.","legit_reason":"Dominio corporativo · Acceso solo por intranet · Sin datos sensibles · Contacto interno verificable","points":100,"time_limit":30},{"id":5,"level":2,"isPhishing":true,"from_name":"IT Helpdesk Corporativo","from_email":"helpdesk@miempresa-support.com","to":"empleado@miempresa.com","date":"Hoy, 07:58 AM","subject":"Acción requerida: Su contraseña corporativa expira en 24 horas","body_html":"<div class=\"em-header\" style=\"background:#37474f\">🔐 IT Helpdesk – Seguridad Corporativa</div><div class=\"em-body\"><p>Estimado empleado,</p><p>Nuestros sistemas detectaron que su contraseña corporativa <strong>expirará en 24 horas</strong>. Sin acción, perderá acceso a <u>todos</u> los sistemas.</p><div class=\"em-info-box\" style=\"border-color:#ff9800;background:#fff3e0\">⚠️ <strong>Acción requerida antes de:</strong> Mañana 08:00 AM</div><p>Ingrese sus credenciales actuales y defina una nueva contraseña:</p><div class=\"em-cta-wrap\"><a class=\"em-cta\" href=\"#\" style=\"background:#37474f\">🔑 Actualizar Contraseña Ahora</a></div><p class=\"em-footer\">IT Security Team | No responda a este correo</p></div>","red_flags":[{"icon":"🌐","title":"Typosquatting (dominio casi idéntico)","desc":"'miempresa-support.com' vs 'miempresa.com'. Verifica siempre el dominio exacto."},{"icon":"🔑","title":"Trampa de credenciales","desc":"El portal pedirá tu contraseña ACTUAL. IT real nunca necesita tu clave vigente para un reset."},{"icon":"⏰","title":"Urgencia de 24h fabricada","desc":"Las políticas de expiración se notifican con varios días y desde el propio sistema operativo."},{"icon":"📧","title":"'Estimado empleado' sin nombre","desc":"Un sistema corporativo real conoce tu nombre. El saludo genérico indica campaña masiva."}],"explanation":"Phishing de credenciales que imita al IT. Typosquatting sutil + urgencia. Objetivo: robar tu contraseña corporativa.","legit_reason":null,"points":150,"time_limit":25},{"id":6,"level":2,"isPhishing":false,"from_name":"Facturación – Proveedor ABC","from_email":"facturas@proveedorabc.com","to":"empleado@miempresa.com","date":"Ayer, 04:22 PM","subject":"Factura #FAC-2024-0445 – Servicios de Consultoría Junio 2024","body_html":"<div class=\"em-header\" style=\"background:#1565c0\">📄 Proveedor ABC S.A. – Facturación</div><div class=\"em-body\"><p>Estimado equipo de MiEmpresa,</p><p>Adjuntamos la factura de servicios de junio 2024, según contrato <strong>#CM-2023-089</strong>.</p><div class=\"em-info-box\" style=\"border-color:#1565c0;background:#e3f2fd\">Número: <strong>FAC-2024-0445</strong> | Período: 01/06/2024 – 30/06/2024<br>Concepto: Consultoría en gestión de proyectos<br>Monto: $4,500.00 + IVA | Vencimiento: 30/07/2024</div><p>Para consultas: facturas@proveedorabc.com | Tel: +1 (555) 234-5678</p><p><strong>Dept. de Facturación</strong> – Proveedor ABC S.A.</p></div>","red_flags":[],"explanation":"Factura legítima. Referencia a contrato específico, múltiples canales verificables, sin urgencia.","legit_reason":"Referencia a contrato existente · Sin urgencia · Múltiples canales verificables · Sin solicitud de credenciales","points":150,"time_limit":25},{"id":7,"level":2,"isPhishing":true,"from_name":"Microsoft 365 Security","from_email":"security-alert@microsoft365-secure-team.com","to":"empleado@miempresa.com","date":"Hoy, 06:33 AM","subject":"Alerta: Inicio de sesión desde ubicación desconocida – Moscú, Rusia","body_html":"<div class=\"em-header\" style=\"background:#0078d4\">🪟 Microsoft 365 Security Alert</div><div class=\"em-body\"><p>Detectamos un inicio de sesión inusual en su cuenta:</p><div class=\"em-info-box\" style=\"border-color:#ffc107;background:#fff3cd\">📍 <strong>Ubicación:</strong> Moscú, Rusia<br>🕐 <strong>Hora:</strong> 06:28 AM (hace 5 minutos)<br>💻 <strong>Dispositivo:</strong> Windows PC desconocido</div><p>Si no fue usted, tome acción <strong>inmediata</strong>:</p><div class=\"em-cta-wrap\"><a class=\"em-cta\" href=\"#\" style=\"background:#d32f2f;margin-right:8px\">🔒 Asegurar mi Cuenta</a><a class=\"em-cta\" href=\"#\" style=\"background:#0078d4\">✅ Fui Yo</a></div><p class=\"em-footer\">Microsoft Corporation © 2024</p></div>","red_flags":[{"icon":"🌐","title":"Dominio Microsoft falso","desc":"Microsoft envía desde microsoft.com. 'microsoft365-secure-team.com' es un dominio impostor."},{"icon":"🗺️","title":"Geografía alarmante calculada","desc":"Usar 'Moscú, Rusia' maximiza el pánico. Los atacantes eligen ubicaciones que generan reacción inmediata."},{"icon":"🎯","title":"Dos botones = trampa doble","desc":"Ambos botones ('Asegurar' y 'Fui Yo') llevan al mismo sitio de phishing."},{"icon":"⏱️","title":"'Hace 5 minutos': presión extrema","desc":"La precisión temporal crea urgencia máxima. Es un dato inventado para impedir análisis."}],"explanation":"Phishing de credenciales Microsoft. Con tu acceso M365 el atacante obtiene correo, OneDrive, Teams y todos los servicios.","legit_reason":null,"points":150,"time_limit":25},{"id":8,"level":2,"isPhishing":false,"from_name":"Carlos Mendoza – Gerente General","from_email":"c.mendoza@miempresa.com","to":"empleado@miempresa.com","date":"Hoy, 09:45 AM","subject":"Reunión de equipo – Resultados Q2 y planificación Q3","body_html":"<div class=\"em-header\" style=\"background:#4a148c\">📅 Comunicación Interna – Gerencia General</div><div class=\"em-body\"><p>Hola equipo,</p><p>Los convoco a la <strong>reunión mensual de resultados</strong> Q2 y planificación Q3 2024.</p><div class=\"em-info-box\" style=\"border-color:#4a148c;background:#f3e5f5\">📅 <strong>Fecha:</strong> Jueves 20 de junio, 10:00 AM – 12:00 PM<br>📍 <strong>Lugar:</strong> Sala de Conferencias A (piso 3) + Teams</div><p><strong>Agenda:</strong> KPIs Q2 · Análisis de brechas · Objetivos Q3 · Preguntas</p><p>Confirmen asistencia respondiendo este correo.<br><strong>Carlos Mendoza</strong> | Gerente General | Ext. 1001</p></div>","red_flags":[],"explanation":"Correo interno legítimo. Dominio corporativo oficial, agenda estructurada, contacto verificable.","legit_reason":"Dominio corporativo · Agenda concreta · Canales de respuesta múltiples · Sin datos sensibles","points":150,"time_limit":25},{"id":9,"level":3,"isPhishing":true,"from_name":"Roberto Sánchez – CEO","from_email":"r.sanchez@miempresa-corp.net","to":"empleado@miempresa.com","date":"Hoy, 11:02 AM","subject":"CONFIDENCIAL: Transferencia urgente – Adquisición estratégica","body_html":"<div class=\"em-header\" style=\"background:#b71c1c\">CONFIDENCIAL – CEO Office</div><div class=\"em-body\"><p>Hola,</p><p>Estoy en reunión con abogados y <strong>no puedo hablar por teléfono</strong>. Necesito que proceses una transferencia bancaria urgente hoy mismo.</p><p>Estamos cerrando una <strong>adquisición estratégica confidencial</strong>. Por instrucción del consejo, <u>no debe comunicarse internamente hasta su confirmación</u>.</p><div class=\"em-info-box\" style=\"border-color:#b71c1c;background:#ffebee\">Beneficiario: Inversiones Globales LLC | Banco: First National Bank<br>Cuenta: 4782-9901-0023 | Monto: <strong>$47,500 USD</strong></div><p>Procesa y confirma por este mismo correo. <strong>No lo menciones a nadie.</strong></p><p>Roberto Sánchez | CEO, MiEmpresa</p></div>","red_flags":[{"icon":"📧","title":"Business Email Compromise (BEC)","desc":"Suplantar al CEO para transferencias es el ataque más costoso según el FBI IC3. +$26 mil millones anuales."},{"icon":"🌐","title":"Dominio del CEO diferente al corporativo","desc":"'miempresa-corp.net' vs 'miempresa.com'. Un carácter de diferencia, consecuencias devastadoras."},{"icon":"🤫","title":"Solicitud explícita de secreto","desc":"'No lo menciones a nadie' aísla a la víctima e impide que colegas identifiquen el fraude."},{"icon":"📵","title":"Bloquea verificación telefónica","desc":"'No puedo hablar por teléfono' elimina el canal de verificación. Ante transferencias, SIEMPRE llama."}],"explanation":"Business Email Compromise (BEC). El ataque más costoso del mundo. Verifica transferencias por teléfono directo sin importar quién ordena.","legit_reason":null,"points":200,"time_limit":20},{"id":10,"level":3,"isPhishing":false,"from_name":"Comunicaciones – MiEmpresa","from_email":"comunicaciones@miempresa.com","to":"empleado@miempresa.com","date":"Hoy, 08:00 AM","subject":"📰 Boletín Interno MiEmpresa | Junio 2024","body_html":"<div class=\"em-header\" style=\"background:#00695c\">📰 Boletín Interno – Junio 2024</div><div class=\"em-body\"><p><strong>🏆 Noticias del mes</strong></p><p><strong>Nuevo cliente:</strong> MiEmpresa firmó contrato con Corporación XYZ por 12 meses.</p><p><strong>Reconocimientos:</strong> El equipo de ventas superó la meta Q2 en un 18%.</p><hr style=\"border-color:#ddd;margin:12px 0\"><p><strong>📅 Próximos eventos:</strong> 20 Jun: Reunión Q2 | 25 Jun: Día de integración | 30 Jun: Cierre contable</p><hr style=\"border-color:#ddd;margin:12px 0\"><p><strong>💡 Tip de seguridad:</strong> El equipo de TI <u>nunca</u> solicitará su contraseña por correo. Reporte a seguridad@miempresa.com.</p><p class=\"em-footer\">Para cancelar suscripción: Intranet → Comunicaciones</p></div>","red_flags":[],"explanation":"Boletín corporativo legítimo. Dominio oficial, sin solicitudes urgentes, desuscripción vía intranet.","legit_reason":"Dominio corporativo · Contenido informativo · Sin acciones urgentes · Desuscripción en intranet","points":200,"time_limit":20},{"id":11,"level":3,"isPhishing":true,"from_name":"DocuSign","from_email":"firma@docusign-esignature.net","to":"empleado@miempresa.com","date":"Hoy, 10:15 AM","subject":"Documento pendiente: Actualización Contrato Laboral – Vence HOY","body_html":"<div class=\"em-header\" style=\"background:#FFBE00;color:#333\">✍️ DocuSign – Gestión de Documentos</div><div class=\"em-body\"><p>Tiene un documento pendiente de firma de <strong>RRHH – MiEmpresa</strong>:</p><div class=\"em-info-box\" style=\"border-color:#FFBE00;background:#fffde7\">📄 <strong>Documento:</strong> Actualización de términos contractuales 2024<br>📤 <strong>Enviado por:</strong> María González (RRHH)<br>⏰ <strong>Vence:</strong> <span style=\"color:#cc0000\"><strong>Hoy, 5:00 PM</strong></span></div><p><strong>Por favor firme antes de las 5:00 PM para no afectar su próximo pago de nómina.</strong></p><div class=\"em-cta-wrap\"><a class=\"em-cta\" href=\"#\" style=\"background:#FFBE00;color:#333\">✍️ FIRMAR DOCUMENTO AHORA</a></div><p class=\"em-footer\">DocuSign, Inc. | docusign.com</p></div>","red_flags":[{"icon":"🌐","title":"Dominio DocuSign falso","desc":"DocuSign opera desde docusign.com. 'docusign-esignature.net' es un dominio impostor."},{"icon":"💰","title":"Amenaza directa a la nómina","desc":"Vincular la firma con el pago de salario es manipulación financiera. Los contratos no bloquean nóminas en horas."},{"icon":"⏰","title":"Vencimiento el mismo día","desc":"Documentos contractuales con vencimiento de pocas horas son antinatural. Los legales dan 48-72h mínimo."},{"icon":"🔍","title":"Verifica con RRHH directamente","desc":"Ante cualquier solicitud de firma laboral, confirma con RRHH por teléfono antes de proceder."}],"explanation":"Phishing que abusa de plataformas de firma electrónica. La amenaza a la nómina explota una necesidad básica. Verifica con RRHH antes de firmar.","legit_reason":null,"points":200,"time_limit":20},{"id":12,"level":3,"isPhishing":false,"from_name":"Gestión de Activos TI","from_email":"licencias@miempresa.com","to":"empleado@miempresa.com","date":"Ayer, 03:00 PM","subject":"Inventario de licencias software – Acción requerida (antes del viernes)","body_html":"<div class=\"em-header\" style=\"background:#283593\">🖥️ TI – Gestión de Activos y Licencias</div><div class=\"em-body\"><p>Estimado equipo,</p><p>Iniciamos el proceso anual de <strong>renovación de licencias 2024–2025</strong>. Necesitamos su colaboración para completar el inventario.</p><div class=\"em-info-box\" style=\"border-color:#283593;background:#e8eaf6\"><strong>Acceso:</strong> Intranet → TI → Inventario de Software 2024<br><strong>Plazo:</strong> Viernes 21 de junio</div><p>El formulario solicita únicamente: nombre del software, versión y frecuencia de uso.</p><p><strong>Nota:</strong> No es necesario proporcionar contraseñas ni claves de licencia.</p><p>Equipo TI | licencias@miempresa.com | Ext. 2250</p></div>","red_flags":[],"explanation":"Correo legítimo de TI. Solo intranet, explica qué se necesita, NO solicita contraseñas, plazo razonable.","legit_reason":"Dominio corporativo · Solo intranet · Sin credenciales requeridas · Transparencia del proceso","points":200,"time_limit":20},{"id":13,"level":4,"isPhishing":true,"from_name":"LinkedIn","from_email":"notifications@linkedin-messages.com","to":"empleado@miempresa.com","date":"Hoy, 12:30 PM","subject":"Ana García de TechCorp quiere conectar contigo en LinkedIn","body_html":"<div class=\"em-header\" style=\"background:#0077b5\">💼 LinkedIn</div><div class=\"em-body\"><div class=\"em-info-box\" style=\"border-color:#0077b5;background:#f3f6f8;display:flex;align-items:center;gap:15px\"><div style=\"width:55px;height:55px;background:#0077b5;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:20px;flex-shrink:0\">AG</div><div><strong>Ana García</strong><br>Directora de RRHH | TechCorp<br><span style=\"color:#0077b5\">500+ conexiones en común</span></div></div><p><em>\"Hola, vi tu perfil y creo que podríamos colaborar. Tenemos una posición de liderazgo que podría interesarte.\"</em></p><div class=\"em-cta-wrap\"><a class=\"em-cta\" href=\"#\" style=\"background:#0077b5\">Aceptar invitación</a></div><p class=\"em-footer\">LinkedIn Corporation © 2024</p></div>","red_flags":[{"icon":"🌐","title":"Dominio LinkedIn falso","desc":"LinkedIn usa linkedin.com. 'linkedin-messages.com' es dominio impostor."},{"icon":"🎣","title":"Phishing de establecimiento de contacto","desc":"Una vez aceptas, el atacante enviará malware o solicitará información confidencial."},{"icon":"💼","title":"Oferta laboral como cebo","desc":"El atacante investigó tus aspiraciones profesionales previo al ataque (OSINT). Es spear phishing."},{"icon":"📧","title":"Accede directamente a linkedin.com","desc":"Siempre verifica solicitudes accediendo directamente al sitio. Nunca desde emails."}],"explanation":"Spear phishing por LinkedIn. Primero establece confianza y luego usa esa conexión para enviar malware o robar información.","legit_reason":null,"points":250,"time_limit":18},{"id":14,"level":4,"isPhishing":false,"from_name":"Ciberseguridad – MiEmpresa","from_email":"seguridad@miempresa.com","to":"empleado@miempresa.com","date":"Hoy, 09:00 AM","subject":"Actualización de seguridad: Windows Defender KB5034441 – Martes","body_html":"<div class=\"em-header\" style=\"background:#e65100\">🛡️ Equipo de Ciberseguridad – MiEmpresa</div><div class=\"em-body\"><p>Estimado colaborador,</p><p>El <strong>martes 18 de junio</strong>, el sistema WSUS desplegará automáticamente la actualización de seguridad <strong>KB5034441</strong> en todos los equipos.</p><div class=\"em-info-box\" style=\"border-color:#e65100;background:#fff3e0\">✅ <strong>No es necesaria ninguna acción de su parte.</strong><br>La actualización ocurrirá automáticamente durante el reinicio.</div><p>Si experimenta problemas: helpdesk.miempresa.com o Ext. 2200.</p><p>Esta comunicación fue aprobada por el CISO. Verifique en el portal de seguridad (intranet).</p></div>","red_flags":[],"explanation":"Comunicación legítima. Dominio corporativo, sin acción requerida, técnicamente específica (WSUS, KB real), verificable en intranet.","legit_reason":"Dominio corporativo · Sin acción requerida · Técnicamente específico · Verificable en intranet","points":250,"time_limit":18},{"id":15,"level":4,"isPhishing":true,"from_name":"Servicio de Impuestos Internos","from_email":"notificaciones@sii-tributario.org","to":"empleado@miempresa.com","date":"Hoy, 08:45 AM","subject":"NOTIFICACIÓN OFICIAL: Reembolso de $2,340 pendiente de reclamación","body_html":"<div class=\"em-header\" style=\"background:#1a237e\">🏛️ SERVICIO DE IMPUESTOS INTERNOS – Notificación Oficial</div><div class=\"em-body\"><p>Estimado contribuyente,</p><p>Tras revisar su declaración fiscal, tiene derecho a un <strong>reembolso de $2,340.00</strong> del período fiscal 2023.</p><div class=\"em-info-box\" style=\"border-color:#1a237e;background:#e8eaf6\">Referencia: <strong>REF-2024-TX-88291</strong> | Monto: <strong>$2,340.00 USD</strong><br>Estado: ✅ Aprobado – Pendiente de reclamación | Vencimiento: 30 días</div><p>Para recibir su reembolso, verifique su identidad y proporcione sus <strong>datos bancarios</strong>:</p><div class=\"em-cta-wrap\"><a class=\"em-cta\" href=\"#\" style=\"background:#1a237e\">Reclamar mi Reembolso →</a></div></div>","red_flags":[{"icon":"🌐","title":"Dominio gubernamental falso","desc":"Los servicios fiscales usan dominios .gov. 'sii-tributario.org' no es un dominio gubernamental legítimo."},{"icon":"💰","title":"Reembolso inesperado como cebo","desc":"La promesa de dinero explota el pensamiento desiderativo. Si no esperabas un reembolso, sospecha."},{"icon":"🏦","title":"Datos bancarios por email","desc":"Los organismos fiscales NUNCA piden datos bancarios por email. Los reembolsos usan información ya registrada."},{"icon":"⏰","title":"Vencimiento artificial de 30 días","desc":"Urgencia fabricada para actuar antes de consultar con alguien."}],"explanation":"Phishing tributario. Combina promesa de dinero con autoridad gubernamental. Objetivo: robar datos bancarios o credenciales fiscales.","legit_reason":null,"points":250,"time_limit":18},{"id":16,"level":4,"isPhishing":false,"from_name":"Amazon Web Services","from_email":"billing@aws.amazon.com","to":"empleado@miempresa.com","date":"01 Jun 2024, 12:00 AM","subject":"Your AWS bill for May 2024 is ready","body_html":"<div class=\"em-header\" style=\"background:#232f3e\">☁️ Amazon Web Services – Billing</div><div class=\"em-body\"><p>Dear AWS Customer,</p><p>Your AWS invoice for May 2024 is now available.</p><div class=\"em-info-box\" style=\"background:#f5f5f5;border-color:#232f3e\"><strong>Account ID:</strong> 123456789012<br><strong>Billing Period:</strong> May 1 – May 31, 2024<br><strong>Total Charges:</strong> $1,847.23 USD | Payment: Visa ****4521</div><p>To view your invoice, sign in to the <strong>AWS Management Console</strong> at <em>console.aws.amazon.com</em> → Billing.</p><p>Amazon Web Services | billing@aws.amazon.com</p></div>","red_flags":[],"explanation":"Factura legítima de AWS. Dominio oficial aws.amazon.com, datos parciales verificables, acceso directo a consola sin enlace embebido.","legit_reason":"Dominio AWS oficial · Datos parciales verificables · Sin enlace directo embebido · Instrucciones de acceso directo","points":250,"time_limit":18},{"id":17,"level":5,"isPhishing":true,"from_name":"GitHub Security","from_email":"noreply@github-security.io","to":"empleado@miempresa.com","date":"Hoy, 09:23 AM","subject":"Critical vulnerability in miempresa/core-api – CVE-2024-3094 (CVSS 10.0)","body_html":"<div class=\"em-header\" style=\"background:#24292e\">🐙 GitHub Security Alert</div><div class=\"em-body\"><p>GitHub detected a <strong>critical vulnerability (CVE-2024-3094)</strong> in <strong>miempresa/core-api</strong>.</p><div class=\"em-info-box\" style=\"border-color:#ffc107;background:#fff3cd\">🔴 <strong>CRITICAL – CVSS Score: 10.0</strong><br>Package: xz-utils (5.6.0 / 5.6.1) | Impact: Remote Code Execution<br>Repository: <strong>miempresa/core-api</strong> (branch: main)</div><p>A malicious actor could exploit this to gain <strong>unauthorized access to your systems</strong>.</p><div class=\"em-cta-wrap\"><a class=\"em-cta\" href=\"#\" style=\"background:#24292e\">View Security Advisory &amp; Patch</a></div><p class=\"em-footer\">GitHub, Inc. | github.com/security</p></div>","red_flags":[{"icon":"🌐","title":"Dominio GitHub falso","desc":"GitHub usa github.com. 'github-security.io' es dominio falso para atacar perfiles técnicos."},{"icon":"🔬","title":"CVE real usado como cebo","desc":"CVE-2024-3094 es una vulnerabilidad real (backdoor XZ Utils). Los atacantes usan CVEs reales para dar credibilidad."},{"icon":"🎯","title":"Nombre de repositorio obtenido por OSINT","desc":"'miempresa/core-api' fue encontrado en GitHub público. Es spear phishing preparado."},{"icon":"⚡","title":"CVSS 10.0 genera urgencia técnica extrema","desc":"Los desarrolladores actúan rápido ante críticas. Este sesgo profesional es lo que el atacante explota."}],"explanation":"Spear phishing técnico APT. El atacante conoce el repositorio, usa un CVE real y explota el instinto de respuesta inmediata de perfiles técnicos.","legit_reason":null,"points":300,"time_limit":15},{"id":18,"level":5,"isPhishing":false,"from_name":"Dropbox Business","from_email":"no-reply@dropbox.com","to":"empleado@miempresa.com","date":"Hoy, 11:00 AM","subject":"Laura Martínez shared 'Propuesta Q3 2024.pdf' with you","body_html":"<div class=\"em-header\" style=\"background:#0061FF\">📁 Dropbox Business</div><div class=\"em-body\"><p><strong>Laura Martínez (l.martinez@miempresa.com)</strong> ha compartido un archivo contigo.</p><div class=\"em-info-box\" style=\"border-color:#0061FF;background:#f0f4ff;display:flex;align-items:center;gap:15px\"><span style=\"font-size:36px\">📄</span><div><strong>Propuesta Q3 2024.pdf</strong><br>Compartido por: l.martinez@miempresa.com | Tamaño: 2.4 MB | Modificado: Hoy</div></div><div class=\"em-cta-wrap\"><a class=\"em-cta\" href=\"#\" style=\"background:#0061FF\">Abrir en Dropbox</a></div><p class=\"em-footer\">Recibiste este email porque l.martinez@miempresa.com compartió desde Dropbox Business.</p></div>","red_flags":[],"explanation":"Compartir legítimo de Dropbox. Dominio oficial, remitente del dominio corporativo, nombre de archivo específico y contextualmente relevante.","legit_reason":"Dominio Dropbox oficial · Remitente del dominio corporativo · Nombre de archivo específico · Contexto relevante","points":300,"time_limit":15},{"id":19,"level":5,"isPhishing":true,"from_name":"Zoom","from_email":"no-reply@zoom-webinar-invite.com","to":"empleado@miempresa.com","date":"Hoy, 08:00 AM","subject":"Capacitación OBLIGATORIA – Cumplimiento y Ética Empresarial – HOY 3 PM","body_html":"<div class=\"em-header\" style=\"background:#2D8CFF\">📹 Zoom Webinar – Convocatoria Oficial</div><div class=\"em-body\"><p>Ha sido convocado a una <strong>capacitación obligatoria</strong> de cumplimiento normativo.</p><div class=\"em-info-box\" style=\"border-color:#2D8CFF;background:#eff6ff\">📋 <strong>Capacitación:</strong> Cumplimiento y Ética Empresarial 2024<br>📅 <strong>Fecha:</strong> <span style=\"color:#cc0000\"><strong>Hoy, 3:00 PM – 5:00 PM</strong></span><br>⚠️ <strong>Asistencia:</strong> OBLIGATORIA – Afecta evaluación de desempeño</div><p>Para unirse, complete el registro. El sistema <strong>solicitará sus credenciales corporativas</strong> para verificar que es empleado autorizado.</p><div class=\"em-cta-wrap\"><a class=\"em-cta\" href=\"#\" style=\"background:#2D8CFF\">Unirse a Zoom – Registro requerido</a></div></div>","red_flags":[{"icon":"🌐","title":"Dominio Zoom falso","desc":"Zoom usa zoom.us. 'zoom-webinar-invite.com' es dominio falso."},{"icon":"🔑","title":"Zoom no pide credenciales corporativas","desc":"Zoom nunca solicita las credenciales de tu empresa para unirte a una reunión."},{"icon":"⚖️","title":"Coerción laboral (evaluación de desempeño)","desc":"Vincular asistencia con evaluación elimina el pensamiento crítico. Táctica avanzada."},{"icon":"📅","title":"Capacitación obligatoria comunicada el mismo día","desc":"Una capacitación de compliance comunicada y celebrada el mismo día es operativamente imposible."}],"explanation":"Phishing de Zoom que combina autoridad + coerción laboral + urgencia. Las 'credenciales corporativas para verificar identidad' son el robo directo.","legit_reason":null,"points":300,"time_limit":15},{"id":20,"level":5,"isPhishing":false,"from_name":"Red Team – Ciberseguridad","from_email":"redteam@miempresa.com","to":"empleado@miempresa.com","date":"Hoy, 10:00 AM","subject":"Resultado de su prueba de phishing simulado – Informe personal disponible","body_html":"<div class=\"em-header\" style=\"background:#1b5e20\">✅ Red Team – Ciberseguridad MiEmpresa</div><div class=\"em-body\"><p>Estimado colaborador,</p><p>Como parte del <strong>programa anual de seguridad</strong>, nuestro equipo realizó un <strong>ejercicio controlado de phishing simulado</strong> autorizado por la Dirección General.</p><p>Sus resultados individuales están disponibles en la intranet:</p><div class=\"em-info-box\" style=\"border-color:#1b5e20;background:#e8f5e9\"><strong>Ruta:</strong> Intranet → Seguridad → Resultados Ejercicio Phishing 2024</div><p>Red Team – Ciberseguridad | redteam@miempresa.com | Ext. 2400<br><em>Ejercicio autorizado por: Roberto Sánchez, CEO | María López, CISO</em></p></div>","red_flags":[],"explanation":"Comunicación legítima del Red Team. Dominio corporativo, acceso solo en intranet, cadena de autorización explícita, sin solicitud de datos.","legit_reason":"Dominio corporativo · Solo intranet · Autorización explícita verificable (CEO+CISO) · Sin solicitud de datos","points":300,"time_limit":15},{"id":21,"level":6,"type":"email","isPhishing":true,"categoria":"BEC","from_name":"Dr. Fernando Vásquez — CFO","from_email":"cfo@miempresa-finance.com","to":"empleado@miempresa.com","date":"Hoy, 14:32 PM","subject":"CONFIDENCIAL: Wire transfer para cierre de adquisición — HOY 3pm","body_html":"<div class=\"em-header\" style=\"background:#1a237e\">🏦 Oficina del CFO — Comunicación Confidencial</div><div class=\"em-body\"><p>Hola equipo de pagos,</p><p>Necesito que procesen este wire antes del cierre bancario (3:00 PM). Es para una adquisición estratégica que se cierra hoy. El equipo legal ya está al tanto, pero <strong>por instrucción del abogado externo no puede pasar por los canales normales de aprobación esta vez.</strong></p><div class=\"em-info-box\" style=\"border-color:#b71c1c;background:#ffebee\">Beneficiario: <strong>Meridian Holdings LLC</strong><br>Monto: <strong>$142,800 USD</strong> | Routing: 021000021 | Cta: 7741982301</div><p><strong>No comenten esto con otros colegas hasta que se confirme la operación.</strong> El CEO informará al equipo después de las 5pm.</p><p>— Dr. Fernando Vásquez, CFO</p></div>","red_flags":[{"icon":"🌐","title":"Dominio lateral del CFO","desc":"'miempresa-finance.com' vs 'miempresa.com'. El atacante registró un dominio casi idéntico al corporativo."},{"icon":"🚫","title":"'No puede pasar por los canales normales'","desc":"Los canales de aprobación existen exactamente para detectar fraudes. Eliminarlos es la táctica central del atacante."},{"icon":"🤫","title":"'No comenten' — aislamiento estratégico","desc":"Impide que compañeros identifiquen el fraude. Las adquisiciones reales no requieren silencio del equipo de pagos."},{"icon":"⏰","title":"Cierre bancario como presión artificial","desc":"El plazo de las 3:00 PM impide verificación. Regla absoluta: llama al CFO al número que ya conoces."}],"explanation":"BEC sofisticado que imita al CFO desde dominio casi idéntico. La instrucción de 'saltarse los canales normales' es la señal definitiva de fraude. Verifica SIEMPRE por teléfono.","legit_reason":null,"points":350,"time_limit":15,"meta_q":"¿Por qué 'no puede pasar por los canales normales de aprobación' es la señal más definitiva de fraude BEC?","meta_ops":["Los canales de aprobación existen exactamente para detectar fraudes — eliminarlos intencionalmente revela el engaño","Porque el monto de $142,800 es inusualmente alto para una transferencia corporativa","Porque el plazo de cierre bancario es a las 3:00 PM de hoy mismo","Porque el CFO usa título 'Dr.' que no es habitual en comunicaciones internas"],"meta_ok":0},{"id":22,"level":6,"type":"email","isPhishing":true,"categoria":"BEC","from_name":"Compensaciones — RRHH","from_email":"compensaciones@rrhh-grupo.net","to":"empleado@miempresa.com","date":"Hoy, 09:15 AM","subject":"Urgente: Actualización de datos bancarios — Ajuste de nómina aprobado","body_html":"<div class=\"em-header\" style=\"background:#2e7d32\">💰 Recursos Humanos — Comité de Compensaciones</div><div class=\"em-body\"><p>Estimada colaboradora,</p><p>El Comité Ejecutivo aprobó un ajuste especial en tu nómina para este mes. Para procesar el depósito adicional, necesitamos que actualices tu información bancaria en el formulario seguro:</p><div class=\"em-cta-wrap\"><a class=\"em-cta\" href=\"#\" style=\"background:#2e7d32\">ACTUALIZAR DATOS BANCARIOS →</a></div><p class=\"em-footer\">https://rrhh-datos-seguros.net/formulario</p><p><strong>IMPORTANTE:</strong> Completa el proceso antes de las 6:00 PM de hoy para que el ajuste se refleje en el pago de este mes.</p></div>","red_flags":[{"icon":"🌐","title":"Dominio externo no corporativo","desc":"rrhh-grupo.net y el link rrhh-datos-seguros.net no son el dominio corporativo miempresa.com."},{"icon":"🏦","title":"RRHH nunca pide datos bancarios por formulario web externo","desc":"El proceso correcto es en el portal corporativo o presencialmente. Un formulario externo capturará tus datos sin control."},{"icon":"💰","title":"'Ajuste especial' — cebo de codicia","desc":"La promesa de dinero extra activa un sesgo emocional que inhibe el pensamiento crítico."},{"icon":"⏰","title":"Plazo de hoy para prevenir verificación","desc":"El plazo de 6:00 PM impide verificar con RRHH en persona o por teléfono."}],"explanation":"BEC orientado a robo de datos bancarios del empleado. RRHH nunca solicita actualización por formulario externo. El atacante redirigirá futuras nóminas.","legit_reason":null,"points":350,"time_limit":15,"meta_q":"¿Por qué RRHH nunca solicita actualización de datos bancarios por formulario web externo?","meta_ops":["El portal corporativo interno es el único canal seguro y auditable — un formulario externo capturará tus datos sin ningún control","Porque los formularios web externos son más lentos que los portales internos","Porque los datos bancarios son demasiado sensibles para cualquier tipo de formulario","Porque RRHH siempre prefiere realizar este proceso en persona sin ninguna excepción"],"meta_ok":0},{"id":23,"level":6,"type":"qr","isPhishing":true,"categoria":"quishing","from_name":"Control de Acceso — Seguridad","from_email":"acceso@seguridad-corp.net","to":"empleado@miempresa.com","date":"Hoy, 08:00 AM","subject":"OBLIGATORIO: Renovación de badge de acceso — Escanea el QR antes del viernes","body_html":"<div class=\"em-header\" style=\"background:#212121\">🔐 Departamento de Seguridad Física — Control de Acceso</div><div class=\"em-body\"><p>Estimado empleado,</p><p>Nuestro sistema de control de acceso migró a la nueva plataforma de autenticación. <strong>Todos los empleados deben renovar su badge digital antes del viernes.</strong></p><p>Escanea el código QR con tu teléfono para completar el proceso:</p><div class=\"qr-placeholder\" data-url=\"https://badge-renewal-corp.net/auth\"></div><p class=\"em-footer\">URL destino: badge-renewal-corp.net/auth — Empleados que no completen el proceso perderán acceso el lunes.</p></div>","red_flags":[{"icon":"📱","title":"QR apunta a dominio externo","desc":"badge-renewal-corp.net no es el dominio corporativo miempresa.com. Los QR ocultan la URL — el atacante lo sabe."},{"icon":"🏢","title":"Badge renewal nunca se hace por QR en email","desc":"Las renovaciones de badge se hacen presencialmente en Recepción o Seguridad, nunca por link externo."},{"icon":"🌐","title":"Remitente en dominio no corporativo","desc":"seguridad-corp.net no es el dominio real de la empresa. Seguridad interna usa @miempresa.com."},{"icon":"😨","title":"Amenaza de perder acceso físico","desc":"Perder acceso a instalaciones crea pánico inmediato. Táctica de presión para saltarse la verificación."}],"explanation":"Quishing (QR phishing): los QR son peligrosos porque la URL destino no es visible antes de escanear. Siempre verifica el remitente y confirma con Seguridad antes de escanear.","legit_reason":null,"points":350,"time_limit":15,"meta_q":"¿Por qué los códigos QR son especialmente efectivos como vector de phishing?","meta_ops":["La URL destino no es visible antes de escanear — el usuario no puede verificarla como lo haría con un enlace de texto","Porque los QR son difíciles de distinguir entre sí visualmente en un email","Porque los teléfonos móviles tienen menos protecciones de seguridad que las computadoras","Porque los QR corporativos siempre parecen más oficiales y confiables que los enlaces"],"meta_ok":0},{"id":24,"level":6,"type":"sms","isPhishing":true,"categoria":"smishing","from_name":"Número desconocido","from_email":"+1 (855) 247-9031","to":"Tu teléfono","date":"Hoy, 10:14 AM","subject":"SMS de Alerta TI","body_html":"ALERTA IT CORP: Tu cuenta O365 fue comprometida. Verifica AHORA: http://it-secure-verify.net/o365 — perderás acceso en 2h. No respondas. Ref: INC-20249","red_flags":[{"icon":"📱","title":"Número de teléfono externo desconocido","desc":"El helpdesk interno tiene un número registrado. Un número +1 (855) externo nunca envía alertas corporativas reales."},{"icon":"🌐","title":"URL en dominio externo","desc":"it-secure-verify.net no es el dominio corporativo. TI real usa portales internos conocidos para reseteos."},{"icon":"⏰","title":"2 horas: urgencia extrema por SMS","desc":"Los ataques por SMS explotan la inmediatez del canal. TI real usa el sistema de tickets con tiempo razonable."},{"icon":"✍️","title":"Sin tildes y errores gramaticales","desc":"'perderás' vs errores de puntuación son señales de mensaje automatizado malicioso."}],"explanation":"Smishing (SMS phishing). TI real nunca usa números externos para alertas corporativas. El link captura credenciales de O365 — correo, Teams, OneDrive.","legit_reason":null,"points":350,"time_limit":15,"meta_q":"¿Cuál es la señal más definitiva de que este SMS de alerta O365 es smishing y no una alerta real del equipo de TI?","meta_ops":["El número es externo (+1 855) y la URL apunta a un dominio ajeno al corporativo — TI real usa canales conocidos","Porque el SMS no tiene el logo ni los colores de la empresa en el mensaje","Porque los SMS de alertas de TI siempre deben incluir el nombre del técnico responsable","Porque el link usa HTTP en lugar de HTTPS lo que lo hace inseguro automáticamente"],"meta_ok":0},{"id":25,"level":6,"type":"qr","isPhishing":false,"from_name":"Laura Ríos — Coordinadora de Eventos","from_email":"eventos@miempresa.com","to":"empleado@miempresa.com","date":"Hoy, 11:00 AM","subject":"Código QR de acceso — Evento corporativo jueves 15 de mayo","body_html":"<div class=\"em-header\" style=\"background:#00695c\">🎉 Coordinación de Eventos — MiEmpresa</div><div class=\"em-body\"><p>Hola equipo,</p><p>Adjunto el código QR de acceso para el evento corporativo del próximo jueves. Escanea para confirmar tu asistencia y obtener acceso al salón:</p><div class=\"qr-placeholder\" data-url=\"https://eventos.miempresa.com/confirm/EVT-2025-05\"></div><p class=\"em-footer\">URL destino: eventos.miempresa.com/confirm/EVT-2025-05</p><p>Cualquier duda, contáctame directamente.<br><strong>Laura Ríos</strong> — Coordinadora de Eventos | eventos@miempresa.com | Ext. 3201</p></div>","red_flags":[],"explanation":"QR corporativo legítimo. El remitente es del dominio corporativo real (@miempresa.com) y la URL del QR apunta al subdominio corporativo conocido (eventos.miempresa.com).","legit_reason":"Remitente @miempresa.com · URL del QR en subdominio corporativo · Persona verificable con extensión · Sin urgencia ni amenazas","points":350,"time_limit":15},{"id":26,"level":6,"type":"sms","isPhishing":false,"from_name":"Marriott Rewards","from_email":"+506 2234-5678","to":"Tu teléfono","date":"Hoy, 09:03 AM","subject":"SMS de confirmación de reserva","body_html":"Reserva confirmada. Hotel Marriott Reforma, check-in 18 mayo. Código: MXC-4491. Para asistencia llama al +52 55 9138-4888. Marriott Rewards.","red_flags":[],"explanation":"SMS legítimo de confirmación de reserva. No contiene ningún enlace, no solicita acción, incluye información verificable y número de contacto opcional.","legit_reason":"Sin enlace ni URL · Solo información verificable · Número de contacto opcional · Sin urgencia ni solicitud de datos","points":350,"time_limit":15}];
-const LEVELS={"1":{"name":"Amenazas Básicas","color":"#00ff88"},"2":{"name":"Nivel Intermedio","color":"#4a9eff"},"3":{"name":"Ataques Avanzados","color":"#ff9f0a"},"4":{"name":"Spear Phishing","color":"#bf5af2"},"5":{"name":"APT / Élite","color":"#ff2d55"},"6":{"name":"Amenazas Emergentes","color":"#00e5ff"}};
-const BADGES=[{"id":"first","ic":"🎮","nm":"Primera Misión","ds":"Completar el primer correo"},{"id":"lvl1","ic":"🎣","nm":"Cazador de Phish","ds":"Superar el Nivel 1"},{"id":"lvl3","ic":"🔍","nm":"Detective Digital","ds":"Superar el Nivel 3"},{"id":"lvl5","ic":"🏆","nm":"Agente PhishGuard","ds":"Completar los 6 niveles"},{"id":"combo5","ic":"🦅","nm":"Ojo de Águila","ds":"5 aciertos consecutivos"},{"id":"speed","ic":"⚡","nm":"Velocidad Máxima","ds":"Responder en menos de 5 segundos"},{"id":"shield","ic":"🛡️","nm":"Escudo de Acero","ds":"Nivel completo sin perder vidas"},{"id":"elite","ic":"💎","nm":"Gran Maestro","ds":"Puntuación final mayor a 5,000 pts"}];
-const RANKS=[{"min":0,"label":"Aprendiz","color":"#5a7aaa","bg":"rgba(90,122,170,.15)"},{"min":1000,"label":"Analista","color":"#00e5ff","bg":"rgba(0,229,255,.12)"},{"min":3000,"label":"Investigador","color":"#00ff88","bg":"rgba(0,255,136,.12)"},{"min":6000,"label":"Especialista","color":"#ff9f0a","bg":"rgba(255,159,10,.12)"},{"min":10000,"label":"Experto","color":"#bf5af2","bg":"rgba(191,90,242,.12)"},{"min":14000,"label":"Agente de Élite","color":"#ffd60a","bg":"rgba(255,214,10,.15)"}];
-const MISSIONS_POOL=[{"id":1,"emoji":"🎯","titulo":"Sin errores Nivel 1","desc":"Completa el Nivel 1 sin cometer ningún error","tipo":"nivel_perfecto","nivel":1,"meta":1,"xp":100},{"id":2,"emoji":"🔥","titulo":"Racha de fuego","desc":"Consigue 5 respuestas correctas consecutivas","tipo":"racha","meta":5,"xp":150},{"id":3,"emoji":"⚡","titulo":"Velocista","desc":"Responde 3 correos en menos de 8 segundos","tipo":"velocidad","meta":3,"xp":120},{"id":4,"emoji":"🕵️","titulo":"Detector BEC","desc":"Identifica correctamente 2 ataques BEC","tipo":"categoria","cat":"BEC","meta":2,"xp":200},{"id":5,"emoji":"🧠","titulo":"Mente analítica","desc":"Acierta 3 preguntas de metacognición seguidas","tipo":"meta_racha","meta":3,"xp":180},{"id":6,"emoji":"❤️","titulo":"Intocable","desc":"Completa cualquier nivel sin perder ninguna vida","tipo":"nivel_sin_vida","meta":1,"xp":160},{"id":7,"emoji":"📱","titulo":"Maestro QR","desc":"Detecta correctamente los 2 ataques de quishing","tipo":"categoria","cat":"quishing","meta":2,"xp":220},{"id":8,"emoji":"🏆","titulo":"Puntaje élite","desc":"Acumula más de 8,000 puntos en una partida","tipo":"puntaje","meta":8000,"xp":250},{"id":9,"emoji":"💬","titulo":"SMS sin trampa","desc":"Detecta los 2 ataques smishing correctamente","tipo":"categoria","cat":"smishing","meta":2,"xp":200}];
-
-
+JS_ENGINE = r'''
 // ─── STARS BACKGROUND ────────────────────────────────────
 (function(){
   const c=document.getElementById('stars-bg'),ctx=c.getContext('2d');
@@ -947,7 +1359,55 @@ const G=(function(){
 
   return{start,restart,intro,pick,next,nextLevel,evalMeta,misiones};
 })();
+'''
 
+# ══════════════════════════════════════════════════════════
+#  GENERADOR PRINCIPAL
+# ══════════════════════════════════════════════════════════
+def generate():
+    # Serializar datos como JSON embebido en JavaScript
+    emails_js  = json.dumps(EMAILS,        ensure_ascii=False, separators=(',', ':'))
+    levels_js  = json.dumps(LEVELS,        ensure_ascii=False, separators=(',', ':'))
+    badges_js  = json.dumps(BADGES,        ensure_ascii=False, separators=(',', ':'))
+    ranks_js   = json.dumps(RANKS,         ensure_ascii=False, separators=(',', ':'))
+    missions_js= json.dumps(MISSIONS_POOL, ensure_ascii=False, separators=(',', ':'))
+
+    js_data = (
+        f"const EMAILS_RAW={emails_js};\n"
+        f"const LEVELS={levels_js};\n"
+        f"const BADGES={badges_js};\n"
+        f"const RANKS={ranks_js};\n"
+        f"const MISSIONS_POOL={missions_js};\n"
+    )
+
+    html = f"""<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PhishGuard v4 \u2013 Operaci\u00f3n Bandeja de Entrada</title>
+<style>
+{CSS}
+</style>
+</head>
+<body>
+{HTML_BODY}
+<script>
+{js_data}
+{JS_ENGINE}
 </script>
 </body>
-</html>
+</html>"""
+
+    output = Path('PhishGuard_v4.html')
+    output.write_text(html, encoding='utf-8')
+    size_kb = len(html.encode('utf-8')) // 1024
+    print(f"\u2705 PhishGuard v4.0 generado correctamente")
+    print(f"   Archivo : {output.resolve()}")
+    print(f"   Tama\u00f1o  : {len(html):,} caracteres ({size_kb} KB)")
+    print(f"   Escenarios : {len(EMAILS)} (niveles 1-6)")
+    print(f"   Misiones   : {len(MISSIONS_POOL)} en pool, 3 por d\u00eda")
+    print(f"\nAbre PhishGuard_v4.html en tu navegador para jugar.")
+
+if __name__ == '__main__':
+    generate()
